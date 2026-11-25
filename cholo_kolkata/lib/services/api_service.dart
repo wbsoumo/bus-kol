@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:cryptography/cryptography.dart';
 import '../models/models.dart';
 import 'metro_service.dart';
+import 'kolkata_stops.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -99,17 +100,43 @@ class ApiService {
     };
   }
 
-  /// 2. Stop Autocomplete Suggestions
-  Future<List<String>> searchStops(String query) async {
-    if (query.trim().isEmpty) return [];
+  /// 2. Stop Autocomplete Suggestions (Merged Instant 0ms Local + Server Database)
+  Future<List<BusStopItem>> searchStops(String query) async {
+    final local = KolkataStops.searchLocal(query, limit: 12);
+
     try {
-      final endpoint = '/api/stops?q=${Uri.encodeComponent(query)}&limit=8';
-      final data = await _secureGet(endpoint);
+      final endpoint = '/api/stops?q=${Uri.encodeComponent(query)}&limit=15';
+      final data = await _secureGet(endpoint).timeout(const Duration(milliseconds: 1500));
       final list = data['stops'] as List? ?? [];
-      return list.map((s) => (s['stop_name'] ?? '').toString()).toList();
-    } catch (e) {
-      return [];
+
+      final Map<String, BusStopItem> merged = {
+        for (final item in local) item.name.toLowerCase(): item,
+      };
+
+      for (final s in list) {
+        final name = (s['stop_name'] ?? '').toString();
+        if (name.isEmpty) continue;
+        final key = name.toLowerCase();
+        final count = (s['routes_count'] is num) ? (s['routes_count'] as num).toInt() : 0;
+        if (!merged.containsKey(key)) {
+          merged[key] = BusStopItem(
+            name: name,
+            routesCount: count,
+            subtitle: count > 0 ? '$count+ connecting routes' : 'Kolkata Transit Stop',
+          );
+        }
+      }
+
+      return merged.values.toList();
+    } catch (_) {
+      return local;
     }
+  }
+
+  /// Backward-compatible String list
+  Future<List<String>> searchStopNames(String query) async {
+    final stops = await searchStops(query);
+    return stops.map((s) => s.name).toList();
   }
 
   /// 2b. Bus Number / Route Autocomplete Suggestions
