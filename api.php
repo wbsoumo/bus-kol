@@ -828,7 +828,7 @@ if ($route === 'app/update-check') {
         'title' => 'New CholoKolkata Update Available',
         'release_notes' => 'Bug fixes and performance improvements.',
         'play_store_url' => 'https://play.google.com/store/apps/details?id=com.cholokolkata.cholo_kolkata',
-        'download_url' => 'http://cholokolkata.online/CholoKolkata.apk',
+        'download_url' => 'http://cholokolkata.online/download/apk',
     ];
     if (file_exists($cfg_file)) {
         $loaded = json_decode(file_get_contents($cfg_file), true);
@@ -844,9 +844,9 @@ if ($route === 'app/update-check') {
 }
 
 if ($route === 'app/download') {
-    $apk = __DIR__ . '/CholoKolkata.apk';
+    $apk = __DIR__ . '/CholoKolkata-release.apk';
     if (!file_exists($apk)) {
-        $apk = __DIR__ . '/CholoKolkata-release.apk';
+        $apk = __DIR__ . '/CholoKolkata.apk';
     }
     if (file_exists($apk)) {
         header('Content-Type: application/vnd.android.package-archive');

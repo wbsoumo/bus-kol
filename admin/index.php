@@ -376,7 +376,7 @@ if ($action === 'save_app_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title'] ?? 'New CholoKolkata Update Available');
     $notes = trim($_POST['release_notes'] ?? '');
     $play_url = trim($_POST['play_store_url'] ?? 'https://play.google.com/store/apps/details?id=com.cholokolkata.cholo_kolkata');
-    $dl_url = trim($_POST['download_url'] ?? 'http://cholokolkata.online/CholoKolkata.apk');
+    $dl_url = trim($_POST['download_url'] ?? 'http://cholokolkata.online/download/apk');
 
     $cfg = [
         'enabled' => ($mode !== 'none'),
@@ -387,7 +387,7 @@ if ($action === 'save_app_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         'title' => $title ?: 'New CholoKolkata Update Available',
         'release_notes' => $notes,
         'play_store_url' => $play_url ?: 'https://play.google.com/store/apps/details?id=com.cholokolkata.cholo_kolkata',
-        'download_url' => $dl_url ?: 'http://cholokolkata.online/CholoKolkata.apk',
+        'download_url' => $dl_url ?: 'http://cholokolkata.online/download/apk',
         'updated_at' => date('Y-m-d H:i:s T'),
     ];
 
@@ -443,7 +443,7 @@ $app_update_cfg = [
     'title' => 'New CholoKolkata Update Available',
     'release_notes' => 'Improved 100% offline bus search, faster route loading, and bug fixes.',
     'play_store_url' => 'https://play.google.com/store/apps/details?id=com.cholokolkata.cholo_kolkata',
-    'download_url' => 'http://cholokolkata.online/CholoKolkata.apk',
+    'download_url' => 'http://cholokolkata.online/download/apk',
     'updated_at' => '',
 ];
 $cfg_path = __DIR__ . '/../app_update_config.json';
@@ -1105,7 +1105,7 @@ function togglePass() {
                 <div id="au_direct_box">
                     <label class="block font-bold text-slate-700 uppercase mb-1.5">Direct APK Download Link (In-App)</label>
                     <input type="url" name="download_url" value="<?= htmlspecialchars($app_update_cfg['download_url']) ?>"
-                        placeholder="http://cholokolkata.online/CholoKolkata.apk"
+                        placeholder="http://cholokolkata.online/download/apk"
                         class="w-full px-3 py-2.5 rounded-xl border border-slate-200 font-mono text-slate-800">
                     <p class="text-[11px] text-slate-400 mt-1">App streams this APK inside the update dialog with a live progress bar &amp; launches Android installer.</p>
                 </div>
