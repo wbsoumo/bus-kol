@@ -102,7 +102,7 @@ if (isset($_GET['endpoint'])) {
 // -------------------------------------------------------------
 // 1. BUS SEARCH & MULTI-HOP 1-TRANSFER FINDER
 // -------------------------------------------------------------
-if ($route === 'search') {
+if ($route === 'search' || $route === 'routes') {
     $db = get_db();
     $from = trim($_GET['from'] ?? '');
     $to = trim($_GET['to'] ?? '');
