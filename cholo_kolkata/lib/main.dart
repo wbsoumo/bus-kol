@@ -4,8 +4,11 @@ import 'screens/metro_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/drawer_pages.dart';
 import 'services/api_service.dart';
+import 'services/notification_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService().init();
   runApp(const CholoKolkataApp());
 }
 

@@ -20,3 +20,4 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'KolkataTransitSecureKey2026WIMT!')
     WEBSITE_URL = os.environ.get('WEBSITE_URL', 'http://cholokolkata.online/')
     DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1')
+

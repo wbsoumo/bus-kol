@@ -373,13 +373,10 @@ class _ResultsScreenState extends State<ResultsScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: () {
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            builder: (ctx) => FractionallySizedBox(
-              heightFactor: 0.88,
-              child: LiveTrackSheet(
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => LiveTrackScreen(
                 routeId: r.id,
                 routeNo: r.routeNo,
                 busType: r.busType,
@@ -536,36 +533,72 @@ class _ResultsScreenState extends State<ResultsScreen> {
             const SizedBox(height: 8),
 
             // Leg 1
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: const Color(0xFFE0F2F1), borderRadius: BorderRadius.circular(3)),
-                  child: Text(tr.leg1.routeNo, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF00796B))),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text('${tr.leg1.fromStop} ➔ ${tr.leg1.toStop}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                ),
-                Text('₹${tr.leg1.fare}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: Color(0xFF1B5E20))),
-              ],
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => LiveTrackScreen(
+                      routeId: tr.leg1.id,
+                      routeNo: tr.leg1.routeNo,
+                      busType: tr.leg1.busType,
+                      initialFrom: tr.leg1.fromStop,
+                      initialTo: tr.leg1.toStop,
+                    ),
+                  ),
+                );
+              },
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: const Color(0xFFE0F2F1), borderRadius: BorderRadius.circular(3)),
+                    child: Text(tr.leg1.routeNo, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF00796B))),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text('${tr.leg1.fromStop} ➔ ${tr.leg1.toStop}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                  Text('₹${tr.leg1.fare}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: Color(0xFF1B5E20))),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+                ],
+              ),
             ),
             const Divider(height: 12),
 
             // Leg 2
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: const Color(0xFFFFE0B2), borderRadius: BorderRadius.circular(3)),
-                  child: Text(tr.leg2.routeNo, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFFE65100))),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text('${tr.leg2.fromStop} ➔ ${tr.leg2.toStop}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                ),
-                Text('₹${tr.leg2.fare}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: Color(0xFF1B5E20))),
-              ],
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => LiveTrackScreen(
+                      routeId: tr.leg2.id,
+                      routeNo: tr.leg2.routeNo,
+                      busType: tr.leg2.busType,
+                      initialFrom: tr.leg2.fromStop,
+                      initialTo: tr.leg2.toStop,
+                    ),
+                  ),
+                );
+              },
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: const Color(0xFFFFE0B2), borderRadius: BorderRadius.circular(3)),
+                    child: Text(tr.leg2.routeNo, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFFE65100))),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text('${tr.leg2.fromStop} ➔ ${tr.leg2.toStop}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                  Text('₹${tr.leg2.fare}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: Color(0xFF1B5E20))),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+                ],
+              ),
             ),
             const SizedBox(height: 8),
 

@@ -10,3 +10,4 @@ if (file_exists($static_file)) {
 } else {
     echo "<h1>CholoKolkata Server Active</h1><p><a href='/deploy.php?key=cholo2026&run=1'>Run Deployer</a></p>";
 }
+
