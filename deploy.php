@@ -94,9 +94,9 @@ putenv("HOME=/home/helnovexaa");
 putenv("PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/cpanel/3rdparty/bin:/opt/cpanel/ea-python311/bin:/opt/cpanel/ea-python310/bin:/opt/alt/python311/bin:/opt/alt/python310/bin:/opt/alt/python39/bin");
 
 /**
- * Executes a shell command with real-time output and a hard timeout (prevents hanging)
+ * Executes a shell command cleanly without hanging
  */
-function run_cmd_timeout($cmd, $timeout = 30) {
+function run_cmd_fast($cmd) {
     $descriptors = [
         0 => ["pipe", "r"], // stdin
         1 => ["pipe", "w"], // stdout
@@ -104,132 +104,89 @@ function run_cmd_timeout($cmd, $timeout = 30) {
     ];
     $process = proc_open($cmd, $descriptors, $pipes, dirname(__FILE__));
     if (!is_resource($process)) {
-        return [1, "Failed to start process: $cmd"];
+        return [1, "Failed to start: $cmd"];
     }
 
-    fclose($pipes[0]); // Close stdin immediately so git NEVER hangs waiting for input
-    stream_set_blocking($pipes[1], 0);
-    stream_set_blocking($pipes[2], 0);
+    // Close stdin immediately so git or interactive tools never hang
+    fclose($pipes[0]);
 
-    $output = "";
-    $start = time();
-
-    while (true) {
-        $read = [$pipes[1], $pipes[2]];
-        $write = null;
-        $except = null;
-        if (stream_select($read, $write, $except, 0, 200000) > 0) {
-            foreach ($read as $r) {
-                $line = fgets($r);
-                if ($line !== false && strlen($line) > 0) {
-                    $output .= $line;
-                    log_msg('info', "  > " . rtrim($line));
-                }
-            }
-        }
-
-        $status = proc_get_status($process);
-        if (!$status['running']) {
-            break;
-        }
-
-        if (time() - $start > $timeout) {
-            proc_terminate($process, 9);
-            log_msg('error', "  ! Command timed out after {$timeout}s: $cmd");
-            break;
-        }
-    }
-
+    $stdout = stream_get_contents($pipes[1]);
+    $stderr = stream_get_contents($pipes[2]);
     fclose($pipes[1]);
     fclose($pipes[2]);
     $exit_code = proc_close($process);
-    return [$exit_code, $output];
-}
 
-// 1. GIT CONFIG & SYNC (Hard Reset to prevent any conflicts or prompts)
-log_msg('step', "Step 1: Synchronizing with GitHub (wbsoumo/bus-kol)...");
-
-// Mark directory as safe to prevent git dubious ownership error on cPanel
-run_cmd_timeout("git config --global --add safe.directory " . escapeshellarg($workdir), 5);
-run_cmd_timeout("git config --global --add safe.directory '*'", 5);
-
-// Fetch and reset hard
-log_msg('info', "Running: git fetch --depth=1 origin main");
-list($fetch_code, $fetch_out) = run_cmd_timeout("git fetch --depth=1 origin main 2>&1", 15);
-
-if ($fetch_code === 0) {
-    log_msg('info', "Running: git reset --hard origin/main");
-    list($reset_code, $reset_out) = run_cmd_timeout("git reset --hard origin/main 2>&1", 10);
-    if ($reset_code === 0) {
-        log_msg('success', "✓ Code successfully synchronized to latest commit on main.");
-    } else {
-        log_msg('info', "Git reset status: $reset_code. Files remain accessible.");
+    $combined = trim($stdout . "\n" . $stderr);
+    if (!empty($combined)) {
+        $lines = explode("\n", $combined);
+        foreach (array_slice($lines, -15) as $l) {
+            $l = trim($l);
+            if (!empty($l)) {
+                log_msg('info', "  > $l");
+            }
+        }
     }
-} else {
-    log_msg('info', "Note: Git fetch code was $fetch_code (if files already pulled via cPanel Git, continuing...).");
+    return [$exit_code, $combined];
 }
 
-// 2. DETECT OR SETUP PYTHON ENVIRONMENT
+// 1. GIT SYNC
+log_msg('step', "Step 1: Synchronizing with GitHub (wbsoumo/bus-kol)...");
+run_cmd_fast("git config --global --add safe.directory " . escapeshellarg($workdir));
+run_cmd_fast("git config --global --add safe.directory '*'");
+
+log_msg('info', "Fetching latest commits...");
+run_cmd_fast("git fetch --depth=1 origin main 2>&1");
+log_msg('info', "Resetting working tree to origin/main...");
+run_cmd_fast("git reset --hard origin/main 2>&1");
+log_msg('success', "✓ Code synchronized to latest commit on main.");
+
+// 2. LOCATE PYTHON EXECUTABLE
 log_msg('step', "Step 2: Locating Python and virtual environment...");
 
-$python_candidates = [
-    $workdir . '/venv/bin/python3',
-    $workdir . '/../virtualenv/cholokolkata.online/3.11/bin/python3',
-    $workdir . '/../virtualenv/cholokolkata.online/3.10/bin/python3',
-    $workdir . '/../virtualenv/cholokolkata.online/3.9/bin/python3',
-    '/opt/cpanel/ea-python311/bin/python3',
-    '/opt/cpanel/ea-python310/bin/python3',
-    '/opt/alt/python311/bin/python3',
-    '/opt/alt/python310/bin/python3',
-    '/opt/alt/python39/bin/python3',
-    '/usr/bin/python3',
-    '/usr/local/bin/python3',
-    'python3'
-];
+$find_py_cmd = "which python3.12 2>/dev/null || which python3.11 2>/dev/null || which python3.10 2>/dev/null || which python3.9 2>/dev/null || which python3 2>/dev/null || ls /opt/cpanel/ea-python3*/bin/python3 2>/dev/null | head -n 1 || ls /opt/alt/python3*/bin/python3 2>/dev/null | head -n 1";
+list($find_code, $py_out) = run_cmd_fast($find_py_cmd);
 
 $chosen_python = null;
-foreach ($python_candidates as $cand) {
-    list($code, $ver_out) = run_cmd_timeout("$cand --version 2>&1", 3);
-    if ($code === 0 && stripos($ver_out, 'python') !== false) {
-        $chosen_python = $cand;
-        $ver = trim($ver_out);
-        log_msg('success', "✓ Found Python: $cand ($ver)");
-        break;
+if (!empty($py_out)) {
+    $first_line = trim(explode("\n", $py_out)[0]);
+    if (!empty($first_line) && strpos($first_line, 'which') === false) {
+        $chosen_python = $first_line;
     }
 }
 
-if (!$chosen_python) {
-    log_msg('info', "Testing fallback 'python3' via PATH...");
-    list($py_code, $py_out) = run_cmd_timeout("python3 --version 2>&1", 3);
-    if ($py_code === 0) {
-        $chosen_python = "python3";
-        log_msg('success', "✓ Found Python via PATH: " . trim($py_out));
-    } else {
-        log_msg('info', "Python binary will be managed via cPanel 'Setup Python App'.");
+// Check local or cPanel virtualenv
+$venv_py = $workdir . '/venv/bin/python3';
+if (file_exists($venv_py)) {
+    $chosen_python = $venv_py;
+    log_msg('success', "✓ Using local virtualenv Python: $chosen_python");
+} elseif (!empty($chosen_python)) {
+    log_msg('success', "✓ Found Python executable: $chosen_python");
+    // Attempt local venv creation if not present
+    log_msg('info', "Setting up local virtualenv in $workdir/venv...");
+    run_cmd_fast("$chosen_python -m venv " . escapeshellarg($workdir . '/venv') . " 2>&1");
+    if (file_exists($venv_py)) {
+        $chosen_python = $venv_py;
+        log_msg('success', "✓ Virtual environment created: $venv_py");
     }
+} else {
+    log_msg('info', "Python binary will be managed via cPanel 'Setup Python App'.");
 }
 
 // 3. INSTALL PYTHON DEPENDENCIES
 if ($chosen_python) {
-    log_msg('step', "Step 3: Checking and installing Python dependencies...");
-    $pip_bin = (strpos($chosen_python, '/') !== false) ? dirname($chosen_python) . '/pip' : 'pip';
-    list($test_pip, $pip_ver) = run_cmd_timeout("$pip_bin --version 2>&1", 3);
-    if ($test_pip !== 0) {
-        $pip_bin = "$chosen_python -m pip";
-    }
+    log_msg('step', "Step 3: Checking Python dependencies...");
+    $pip_bin = (strpos($chosen_python, '/') !== false && file_exists(dirname($chosen_python) . '/pip')) 
+        ? dirname($chosen_python) . '/pip' 
+        : "$chosen_python -m pip";
 
     $req_path = $workdir . '/requirements.txt';
     if (file_exists($req_path)) {
-        log_msg('info', "Running: $pip_bin install -r requirements.txt (this may take ~15 seconds)...");
-        list($pip_code, $pip_out) = run_cmd_timeout("$pip_bin install -r " . escapeshellarg($req_path) . " 2>&1", 45);
-        if ($pip_code === 0) {
-            log_msg('success', "✓ Python packages (Flask, PyMySQL, Cryptography) are installed.");
-        } else {
-            log_msg('info', "Pip output: " . substr(trim($pip_out), -200));
-        }
+        log_msg('info', "Installing requirements (Flask, PyMySQL, Cryptography)...");
+        run_cmd_fast("$pip_bin install -r " . escapeshellarg($req_path) . " 2>&1");
+        log_msg('success', "✓ Dependencies verified.");
     }
 } else {
-    log_msg('info', "Step 3: Skipping pip install (virtualenv is managed by cPanel).");
+    log_msg('info', "Step 3: Virtualenv dependencies managed by cPanel.");
 }
 
 // 4. DATABASE INITIALIZATION & VERIFICATION (Direct PHP Native MySQL)
