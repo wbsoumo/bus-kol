@@ -487,18 +487,26 @@ if ($route === 'bus/live/stats') {
 // -------------------------------------------------------------
 // 7. COMMUTER COMMUNITY CHAT
 // -------------------------------------------------------------
-if ($route === 'chat/list') {
+if ($route === 'chat/list' || $route === 'chat/messages') {
     $db = get_db();
     $channel = trim($_GET['channel'] ?? 'general');
-    $stmt = $db->prepare("SELECT * FROM community_chat WHERE channel = ? ORDER BY id DESC LIMIT 40");
-    $stmt->bind_param('s', $channel);
+    $limit = min(intval($_GET['limit'] ?? 40), 100);
+    if ($limit <= 0) $limit = 40;
+
+    if ($channel === 'general' || empty($channel)) {
+        $stmt = $db->prepare("SELECT id, channel, user_name, route_ref, status_tag, message, DATE_FORMAT(created_at, '%h:%i %p') as time_str, created_at FROM community_chat WHERE channel = 'general' ORDER BY id DESC LIMIT ?");
+        $stmt->bind_param('i', $limit);
+    } else {
+        $stmt = $db->prepare("SELECT id, channel, user_name, route_ref, status_tag, message, DATE_FORMAT(created_at, '%h:%i %p') as time_str, created_at FROM community_chat WHERE channel = ? OR channel = 'general' ORDER BY id DESC LIMIT ?");
+        $stmt->bind_param('si', $channel, $limit);
+    }
     $stmt->execute();
     $res = $stmt->get_result();
     $messages = [];
     while ($m = $res->fetch_assoc()) {
         $messages[] = $m;
     }
-    echo json_encode(secure_encrypt(['success' => true, 'messages' => array_reverse($messages)]));
+    echo json_encode(secure_encrypt(['success' => true, 'channel' => $channel, 'messages' => array_reverse($messages)]));
     exit;
 }
 
@@ -507,7 +515,11 @@ if ($route === 'chat/post' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $raw = file_get_contents('php://input');
     $data = json_decode($raw, true) ?? [];
     $channel = trim($data['channel'] ?? 'general');
-    $user = trim($data['user_name'] ?? 'Kolkata_Commuter');
+    $user = trim($data['user_name'] ?? '');
+    if (empty($user) || strtolower($user) === 'commuter' || strtolower($user) === 'passenger') {
+        $rand_num = rand(100, 999);
+        $user = "Passenger #$rand_num";
+    }
     $msg = trim($data['message'] ?? '');
     $route_ref = trim($data['route_ref'] ?? '');
     $status_tag = trim($data['status_tag'] ?? 'Normal');
@@ -516,8 +528,11 @@ if ($route === 'chat/post' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $db->prepare("INSERT INTO community_chat (channel, user_name, route_ref, status_tag, message) VALUES (?, ?, ?, ?, ?)");
         $stmt->bind_param('sssss', $channel, $user, $route_ref, $status_tag, $msg);
         $stmt->execute();
+        $msg_id = $stmt->insert_id;
+        echo json_encode(secure_encrypt(['success' => true, 'id' => $msg_id, 'user_name' => $user]));
+        exit;
     }
-    echo json_encode(secure_encrypt(['success' => true]));
+    echo json_encode(secure_encrypt(['success' => false, 'error' => 'Message required']));
     exit;
 }
 

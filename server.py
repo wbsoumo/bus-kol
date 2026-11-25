@@ -800,19 +800,29 @@ def plan_metro_journey():
 # 3. COMMUTER COMMUNITY CHAT (m-Indicator style)
 # ==========================================
 @app.route('/api/chat/messages', methods=['GET'])
+@app.route('/api/chat/list', methods=['GET'])
 def get_chat_messages():
     channel = request.args.get('channel', 'general').strip()
-    limit = min(int(request.args.get('limit', 30)), 50)
+    limit = min(int(request.args.get('limit', 40)), 100)
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id, channel, user_name, route_ref, status_tag, message,
-                       DATE_FORMAT(created_at, '%%h:%%i %%p') as time_str
-                FROM community_chat
-                WHERE channel = %s OR channel = 'general'
-                ORDER BY id DESC LIMIT %s
-            """, (channel, limit))
+            if channel == 'general' or not channel:
+                cur.execute("""
+                    SELECT id, channel, user_name, route_ref, status_tag, message,
+                           DATE_FORMAT(created_at, '%%h:%%i %%p') as time_str, created_at
+                    FROM community_chat
+                    WHERE channel = 'general'
+                    ORDER BY id DESC LIMIT %s
+                """, (limit,))
+            else:
+                cur.execute("""
+                    SELECT id, channel, user_name, route_ref, status_tag, message,
+                           DATE_FORMAT(created_at, '%%h:%%i %%p') as time_str, created_at
+                    FROM community_chat
+                    WHERE channel = %s OR channel = 'general'
+                    ORDER BY id DESC LIMIT %s
+                """, (channel, limit))
             messages = cur.fetchall()
             messages.reverse()
             return jsonify(secure_encrypt({'success': True, 'channel': channel, 'messages': messages}))
@@ -822,9 +832,12 @@ def get_chat_messages():
 @app.route('/api/chat/post', methods=['POST'])
 def post_chat_message():
     try:
+        import random
         req_data = request.get_json(force=True)
         channel = req_data.get('channel', 'general').strip()
-        user_name = req_data.get('user_name', 'Commuter').strip()[:50]
+        user_name = req_data.get('user_name', '').strip()[:50]
+        if not user_name or user_name.lower() in ('commuter', 'passenger'):
+            user_name = f"Passenger #{random.randint(100, 999)}"
         route_ref = req_data.get('route_ref', '').strip()[:50]
         status_tag = req_data.get('status_tag', 'Normal').strip()[:50]
         message = req_data.get('message', '').strip()
@@ -841,7 +854,7 @@ def post_chat_message():
                 """, (channel, user_name, route_ref, status_tag, message))
                 conn.commit()
                 msg_id = cur.lastrowid
-                return jsonify(secure_encrypt({'success': True, 'id': msg_id}))
+                return jsonify(secure_encrypt({'success': True, 'id': msg_id, 'user_name': user_name}))
         finally:
             conn.close()
     except Exception as e:
