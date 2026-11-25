@@ -147,8 +147,8 @@ void main() {
     });
     expect(forceDirect.isForce, isTrue);
     expect(forceDirect.isPlayStore, isFalse);
-    expect(forceDirect.shouldPrompt(1), isTrue);
-    expect(forceDirect.shouldPrompt(2), isFalse);
+    expect(forceDirect.shouldPrompt(1, '1.0.0'), isTrue);
+    expect(forceDirect.shouldPrompt(2, '1.0.1'), isFalse);
 
     final optionalPlay = AppUpdateConfig.fromJson({
       'enabled': true,
@@ -167,5 +167,15 @@ void main() {
       'latest_version_code': 5,
     });
     expect(disabled.shouldPrompt(1), isFalse);
+
+    final sameCodeNewerName = AppUpdateConfig.fromJson({
+      'enabled': true,
+      'update_mode': 'force',
+      'source': 'direct',
+      'latest_version_code': 1,
+      'latest_version_name': '1.0.1',
+    });
+    expect(sameCodeNewerName.shouldPrompt(1, '1.0.0'), isTrue);
+    expect(sameCodeNewerName.shouldPrompt(1, '1.0.1'), isFalse);
   });
 }

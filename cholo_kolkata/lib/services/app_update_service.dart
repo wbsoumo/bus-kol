@@ -51,9 +51,26 @@ class AppUpdateConfig {
     );
   }
 
-  bool shouldPrompt(int installedVersionCode) {
+  static int _compareVersionNames(String a, String b) {
+    final pa = a.split('+').first.split('.').map((e) => int.tryParse(e.trim()) ?? 0).toList();
+    final pb = b.split('+').first.split('.').map((e) => int.tryParse(e.trim()) ?? 0).toList();
+    final len = pa.length > pb.length ? pa.length : pb.length;
+    for (int i = 0; i < len; i++) {
+      final va = i < pa.length ? pa[i] : 0;
+      final vb = i < pb.length ? pb[i] : 0;
+      if (va != vb) return va.compareTo(vb);
+    }
+    return 0;
+  }
+
+  bool shouldPrompt(int installedVersionCode, [String installedVersionName = '1.0.0']) {
     if (!enabled || updateMode == 'none') return false;
-    return installedVersionCode < latestVersionCode;
+    if (installedVersionCode < latestVersionCode) return true;
+    if (installedVersionCode == latestVersionCode &&
+        _compareVersionNames(installedVersionName, latestVersionName) < 0) {
+      return true;
+    }
+    return false;
   }
 }
 
@@ -103,7 +120,7 @@ class AppUpdateService {
       if (rawCfg == null) return;
 
       final config = AppUpdateConfig.fromJson(rawCfg);
-      if (!config.shouldPrompt(installedCode)) return;
+      if (!config.shouldPrompt(installedCode, installedName)) return;
 
       if (!forceCheck && !config.isForce) {
         final prefs = await SharedPreferences.getInstance();
@@ -420,3 +437,4 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
     );
   }
 }
+
