@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:cryptography/cryptography.dart';
 import '../models/models.dart';
+import 'bus_data_service.dart';
 import 'metro_service.dart';
 import 'kolkata_stops.dart';
 
@@ -55,9 +56,12 @@ class ApiService {
   }
 
   /// Helper to fetch and decrypt from secure endpoint
-  Future<Map<String, dynamic>> _secureGet(String endpoint) async {
+  Future<Map<String, dynamic>> _secureGet(
+    String endpoint, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
     final uri = Uri.parse('$baseUrl$endpoint');
-    final response = await http.get(uri).timeout(const Duration(seconds: 10));
+    final response = await http.get(uri).timeout(timeout);
 
     if (response.statusCode != 200) {
       throw Exception('Server returned status ${response.statusCode}');
@@ -229,7 +233,7 @@ class ApiService {
     }
   }
 
-  /// 9. OTA Dynamic Background Route Sync (No APK updates required)
+  /// 9. OTA Dynamic Background Route Sync (Persists into BusDataService offline cache)
   Future<Map<String, dynamic>> checkBackgroundSync(String currentVersion) async {
     try {
       final endpoint = '/api/sync?version=${Uri.encodeComponent(currentVersion)}';
@@ -237,6 +241,84 @@ class ApiService {
     } catch (e) {
       return {'has_updates': false, 'error': e.toString()};
     }
+  }
+
+  /// Downloads the full compressed transit bundle when an OTA update is published
+  Future<Map<String, dynamic>> fetchOtaBundle() async {
+    return await _secureGet('/api/ota/bundle', timeout: const Duration(seconds: 25));
+  }
+
+  /// Checks OTA version/route counts and silently updates the device's offline database
+  Future<Map<String, dynamic>> syncOtaInBackground({bool force = false}) async {
+    final busData = BusDataService();
+    final check = await checkBackgroundSync(busData.dataVersion);
+    if (check['error'] != null) {
+      return {
+        'success': false,
+        'updated': false,
+        'error': check['error'],
+        'version': busData.dataVersion,
+        'total_routes': busData.totalRoutesCount,
+        'total_stops': KolkataStops.totalStopsCount,
+      };
+    }
+
+    final serverVersion = (check['version'] ?? check['current_version'] ?? busData.dataVersion).toString();
+    final serverRoutes = (check['total_routes'] is num) ? (check['total_routes'] as num).toInt() : 0;
+    final hasUpdates = check['has_updates'] == true ||
+        serverVersion != busData.dataVersion ||
+        (serverRoutes > 0 && serverRoutes != busData.totalRoutesCount);
+
+    if (!hasUpdates && !force) {
+      return {
+        'success': true,
+        'updated': false,
+        'version': busData.dataVersion,
+        'total_routes': busData.totalRoutesCount,
+        'total_stops': KolkataStops.totalStopsCount,
+      };
+    }
+
+    if (!hasUpdates && force) {
+      return {
+        'success': true,
+        'updated': false,
+        'version': serverVersion,
+        'total_routes': busData.totalRoutesCount,
+        'total_stops': KolkataStops.totalStopsCount,
+        'changelog': check['changelog'] ?? 'All routes already up to date.',
+      };
+    }
+
+    final bundle = await fetchOtaBundle();
+    if (bundle['success'] == true && bundle['routes'] != null) {
+      final routesJson = json.encode(bundle['routes']);
+      final stopsJson = json.encode(bundle['stops'] ?? []);
+      final bundleVer = (bundle['version'] ?? serverVersion).toString();
+      final applied = await busData.applyOtaBundle(
+        version: bundleVer,
+        routesJson: routesJson,
+        stopsJson: stopsJson,
+      );
+      if (applied) {
+        return {
+          'success': true,
+          'updated': true,
+          'version': bundleVer,
+          'total_routes': busData.totalRoutesCount,
+          'total_stops': KolkataStops.totalStopsCount,
+          'changelog': check['changelog'] ?? 'Synced ${busData.totalRoutesCount} routes offline (v$bundleVer).',
+        };
+      }
+    }
+
+    return {
+      'success': false,
+      'updated': false,
+      'version': busData.dataVersion,
+      'total_routes': busData.totalRoutesCount,
+      'total_stops': KolkataStops.totalStopsCount,
+    };
   }
 
   /// 10. Crowdsourced "Inside The Bus" Live Location Ping

@@ -76,6 +76,30 @@ if (!$is_authenticated && !empty($action)) {
     exit;
 }
 
+function admin_bump_ota_version($changelog = null) {
+    $version_file = __DIR__ . '/../ota_version.json';
+    $current_v = '2.4.0';
+    if (file_exists($version_file)) {
+        $vdata = json_decode(file_get_contents($version_file), true);
+        if (isset($vdata['version'])) $current_v = $vdata['version'];
+    }
+    $parts = explode('.', $current_v);
+    if (count($parts) === 3) {
+        $parts[2] = intval($parts[2]) + 1;
+        $new_v = implode('.', $parts);
+    } else {
+        $new_v = '2.4.1';
+    }
+    $save_data = [
+        'version' => $new_v,
+        'has_updates' => true,
+        'changelog' => $changelog ?: "New bus routes and transit schedules published by administrator (v$new_v).",
+        'last_updated' => date('Y-m-d H:i:s T')
+    ];
+    @file_put_contents($version_file, json_encode($save_data, JSON_PRETTY_PRINT));
+    return $new_v;
+}
+
 $db = get_admin_db();
 
 // 3. API Action: Get Route Details with Stops Timeline
@@ -180,11 +204,14 @@ if ($action === 'add_route' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $master_stop_stmt->execute();
     }
 
+    $new_v = admin_bump_ota_version("Added route $route_no ($origin ➔ $destination).");
+
     echo json_encode([
         'success' => true,
-        'message' => "Route $route_no successfully published! $total_stops stops indexed.",
+        'message' => "Route $route_no successfully published! $total_stops stops indexed (OTA v$new_v).",
         'route_id' => $route_id,
-        'total_stops' => $total_stops
+        'total_stops' => $total_stops,
+        'ota_version' => $new_v
     ]);
     exit;
 }
@@ -260,10 +287,13 @@ if ($action === 'edit_route' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $master_stop_stmt->execute();
     }
 
+    $new_v = admin_bump_ota_version("Updated route $route_no ($origin ➔ $destination).");
+
     echo json_encode([
         'success' => true,
-        'message' => "Route $route_no updated successfully with $total_stops stops!",
-        'route_id' => $route_id
+        'message' => "Route $route_no updated successfully with $total_stops stops (OTA v$new_v)!",
+        'route_id' => $route_id,
+        'ota_version' => $new_v
     ]);
     exit;
 }
@@ -287,7 +317,8 @@ if ($action === 'delete_route' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->bind_param("i", $route_id);
 
     if ($stmt->execute()) {
-        echo json_encode(['success' => true, 'message' => 'Route and its stops deleted successfully.']);
+        $new_v = admin_bump_ota_version("Removed bus route ID #$route_id.");
+        echo json_encode(['success' => true, 'message' => "Route and its stops deleted successfully (OTA v$new_v).", 'ota_version' => $new_v]);
     } else {
         echo json_encode(['success' => false, 'error' => 'Delete failed: ' . $db->error]);
     }

@@ -66,10 +66,10 @@ class _ResultsScreenState extends State<ResultsScreen> {
       final netTransfers = res['transfers'] as List<TransferRoute>;
       if (mounted && (netDirect.isNotEmpty || netTransfers.isNotEmpty)) {
         setState(() {
-          if (netDirect.length > _directRoutes.length) {
+          if (netDirect.isNotEmpty) {
             _directRoutes = netDirect;
           }
-          if (_transferRoutes.isEmpty && netTransfers.isNotEmpty) {
+          if (netTransfers.isNotEmpty) {
             _transferRoutes = netTransfers;
           }
         });

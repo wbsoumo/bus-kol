@@ -560,10 +560,37 @@ if ($route === 'chat/post' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // -------------------------------------------------------------
-// 8. BACKGROUND OTA UPDATE CHECK & SYNC
+// 8. BACKGROUND OTA UPDATE CHECK & FULL BUNDLE SYNC
 // -------------------------------------------------------------
+function bump_ota_version_file($changelog = null)
+{
+    $vfile = __DIR__ . '/ota_version.json';
+    $v = '2.4.0';
+    if (file_exists($vfile)) {
+        $vdata = json_decode(file_get_contents($vfile), true);
+        if (!empty($vdata['version'])) {
+            $v = $vdata['version'];
+        }
+    }
+    $parts = explode('.', $v);
+    if (count($parts) === 3) {
+        $parts[2] = intval($parts[2]) + 1;
+        $new_v = implode('.', $parts);
+    } else {
+        $new_v = '2.4.1';
+    }
+    $save_data = [
+        'version' => $new_v,
+        'has_updates' => true,
+        'changelog' => $changelog ?: "Kolkata transit routes synced (v$new_v).",
+        'last_updated' => date('Y-m-d H:i:s T')
+    ];
+    @file_put_contents($vfile, json_encode($save_data, JSON_PRETTY_PRINT));
+    return $new_v;
+}
+
 if ($route === 'ota/check' || $route === 'sync') {
-    $client_v = $_GET['version'] ?? '2.4.0';
+    $client_v = trim($_GET['version'] ?? '2.4.0');
     $vfile = __DIR__ . '/ota_version.json';
     $v = '2.4.0';
     $has_update = false;
@@ -578,11 +605,89 @@ if ($route === 'ota/check' || $route === 'sync') {
             }
         }
     }
+    $db = get_db();
+    $rcnt = 0;
+    $scnt = 0;
+    if ($r1 = $db->query("SELECT COUNT(*) AS c FROM routes")) {
+        $rcnt = (int) ($r1->fetch_assoc()['c'] ?? 0);
+    }
+    if ($r2 = $db->query("SELECT COUNT(*) AS c FROM stops")) {
+        $scnt = (int) ($r2->fetch_assoc()['c'] ?? 0);
+    }
     echo json_encode(secure_encrypt([
         'success' => true,
         'version' => $v,
+        'current_version' => $v,
         'has_updates' => $has_update,
+        'total_routes' => $rcnt,
+        'total_stops' => $scnt,
         'changelog' => $changelog
+    ]));
+    exit;
+}
+
+if ($route === 'ota/bundle') {
+    $db = get_db();
+    $vfile = __DIR__ . '/ota_version.json';
+    $v = '2.4.0';
+    if (file_exists($vfile)) {
+        $vdata = json_decode(file_get_contents($vfile), true);
+        if (!empty($vdata['version'])) {
+            $v = $vdata['version'];
+        }
+    }
+
+    // Fetch ordered stops grouped by route_id
+    $stops_by_route = [];
+    $rs = $db->query("SELECT route_id, stop_name FROM route_stops ORDER BY route_id ASC, stop_order ASC");
+    while ($row = $rs->fetch_assoc()) {
+        $stops_by_route[(int) $row['route_id']][] = $row['stop_name'];
+    }
+
+    // Build compact routes map matching BusDataService format
+    $routes_map = [];
+    $rr = $db->query("SELECT id, route_no, route_name, origin, destination, category, bus_type, timetable, image_url FROM routes ORDER BY id ASC");
+    while ($r = $rr->fetch_assoc()) {
+        $rid = (int) $r['id'];
+        $r_stops = $stops_by_route[$rid] ?? [];
+        if (empty($r_stops)) {
+            continue;
+        }
+        $key = strtoupper(preg_replace('/\s+/', '', $r['route_no']));
+        $entry = [
+            'id' => $rid,
+            'r' => $r['route_no'],
+            'f' => $r['origin'],
+            't' => $r['destination'],
+            'rn' => $r['route_name'],
+            'bt' => $r['bus_type'] ?: 'City Bus',
+            'cat' => $r['category'] ?: 'West Bengal Transport Corporation',
+            's' => $r_stops,
+        ];
+        if (!empty($r['timetable']) && $r['timetable'] !== 'Coming Soon') {
+            $entry['tt'] = $r['timetable'];
+        }
+        if (!empty($r['image_url'])) {
+            $entry['img'] = $r['image_url'];
+        }
+        $routes_map[$key][] = $entry;
+    }
+
+    // Fetch all stops for offline autocomplete
+    $stops_list = [];
+    $st = $db->query("SELECT stop_name, routes_count FROM stops ORDER BY routes_count DESC, LENGTH(stop_name) ASC");
+    while ($s = $st->fetch_assoc()) {
+        $stops_list[] = [
+            'n' => $s['stop_name'],
+            'c' => (int) ($s['routes_count'] ?? 0)
+        ];
+    }
+
+    echo json_encode(secure_encrypt([
+        'success' => true,
+        'version' => $v,
+        'routes' => $routes_map,
+        'stops' => $stops_list,
     ]));
     exit;
 }
@@ -650,11 +755,14 @@ if ($route === 'admin/route/add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $m_stmt->execute();
     }
 
+    $new_v = bump_ota_version_file("Route $r_no ($orig ➔ $dest) added via Admin API.");
+
     echo json_encode([
         'success' => true,
-        'message' => "Route $r_no successfully created with $tot stops",
+        'message' => "Route $r_no successfully created with $tot stops (OTA v$new_v)",
         'route_id' => $route_id,
-        'total_stops' => $tot
+        'total_stops' => $tot,
+        'ota_version' => $new_v
     ]);
     exit;
 }

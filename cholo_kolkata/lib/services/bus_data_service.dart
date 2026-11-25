@@ -1,5 +1,8 @@
 import 'dart:convert';
+import 'dart:io' show gzip;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import 'kolkata_stops.dart';
 
@@ -31,12 +34,19 @@ class _OfflineRouteRecord {
   });
 }
 
-class BusDataService {
+class BusDataService extends ChangeNotifier {
   static final BusDataService _instance = BusDataService._internal();
   factory BusDataService() => _instance;
   BusDataService._internal();
 
+  static const String _prefVersionKey = 'ota_data_version';
+  static const String _prefRoutesGzKey = 'ota_routes_gz_v1';
+  static const String _prefStopsGzKey = 'ota_stops_gz_v1';
+  static const String _prefLastSyncKey = 'ota_last_sync';
+
   bool _isInitialized = false;
+  String _dataVersion = '2.4.0';
+  String _lastSyncTime = 'Bundled Offline Core';
   Map<String, List<dynamic>> _routesMap = {};
   final List<_OfflineRouteRecord> _allRecords = [];
   final Map<int, _OfflineRouteRecord> _byId = {};
@@ -99,9 +109,34 @@ class BusDataService {
   ];
 
   int get totalRoutesCount => _allRecords.length;
+  String get dataVersion => _dataVersion;
+  String get lastSyncTime => _lastSyncTime;
 
   Future<void> init() async {
     if (_isInitialized) return;
+
+    // 1. Prefer locally cached OTA bundle if previously synced from server
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedVersion = prefs.getString(_prefVersionKey);
+      final routesGz = prefs.getString(_prefRoutesGzKey);
+      final stopsGz = prefs.getString(_prefStopsGzKey);
+
+      if (cachedVersion != null && routesGz != null && routesGz.isNotEmpty) {
+        final routesJson = utf8.decode(gzip.decode(base64.decode(routesGz)));
+        final stopsJson = (stopsGz != null && stopsGz.isNotEmpty)
+            ? utf8.decode(gzip.decode(base64.decode(stopsGz)))
+            : null;
+        loadFromJsonStrings(routesJson, stopsJson);
+        _dataVersion = cachedVersion;
+        _lastSyncTime = prefs.getString(_prefLastSyncKey) ?? 'Synced via OTA';
+        return;
+      }
+    } catch (_) {
+      // Fall back to bundled APK assets if cache is absent or unreadable
+    }
+
+    // 2. Load bundled offline transit assets
     try {
       final routesJson = await rootBundle.loadString('assets/kolkata_bus_routes.json');
       String? stopsJson;
@@ -113,6 +148,31 @@ class BusDataService {
       _routesMap = fallbackRoutes.map((k, v) => MapEntry(k, v));
       _rebuildIndexes();
       _isInitialized = true;
+    }
+  }
+
+  /// Applies a freshly downloaded OTA bundle in memory and persists it compressed on device.
+  Future<bool> applyOtaBundle({
+    required String version,
+    required String routesJson,
+    required String stopsJson,
+  }) async {
+    try {
+      loadFromJsonStrings(routesJson, stopsJson);
+      _dataVersion = version;
+      _lastSyncTime = 'Just now';
+
+      final prefs = await SharedPreferences.getInstance();
+      final routesGz = base64.encode(gzip.encode(utf8.encode(routesJson)));
+      final stopsGz = base64.encode(gzip.encode(utf8.encode(stopsJson)));
+      await prefs.setString(_prefVersionKey, version);
+      await prefs.setString(_prefRoutesGzKey, routesGz);
+      await prefs.setString(_prefStopsGzKey, stopsGz);
+      await prefs.setString(_prefLastSyncKey, 'Synced v$version');
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

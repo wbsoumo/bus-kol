@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
+import '../services/bus_data_service.dart';
+import '../services/kolkata_stops.dart';
 import '../services/settings_service.dart';
 import 'results_screen.dart';
 
@@ -446,20 +449,39 @@ class OtaSyncPage extends StatefulWidget {
 
 class _OtaSyncPageState extends State<OtaSyncPage> {
   bool _isChecking = false;
-  String _status = 'All transit schedules are up-to-date.';
-  String _lastSync = 'Today, 10:11 AM';
+  String _status = 'Offline transit directory is active and ready.';
 
   void _triggerCheck() async {
     setState(() {
       _isChecking = true;
-      _status = 'Connecting to CholoKolkata OTA transit registry...';
+      _status = 'Checking CholoKolkata OTA transit registry...';
     });
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() {
-      _isChecking = false;
-      _status = 'Route directory verified. 2,172 routes active & synchronized.';
-      _lastSync = 'Just now';
-    });
+    try {
+      final res = await ApiService().syncOtaInBackground(force: true);
+      if (!mounted) return;
+      if (res['success'] == true) {
+        final updated = res['updated'] == true;
+        final routesCount = res['total_routes'] ?? BusDataService().totalRoutesCount;
+        final ver = res['version'] ?? BusDataService().dataVersion;
+        setState(() {
+          _isChecking = false;
+          _status = updated
+              ? 'Synced $routesCount routes to offline cache (v$ver)!'
+              : 'All $routesCount routes are up to date (v$ver).';
+        });
+      } else {
+        setState(() {
+          _isChecking = false;
+          _status = 'Server unreachable right now. Using ${BusDataService().totalRoutesCount} cached offline routes.';
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isChecking = false;
+        _status = 'Offline mode active with ${BusDataService().totalRoutesCount} cached routes.';
+      });
+    }
   }
 
   @override
@@ -504,12 +526,12 @@ class _OtaSyncPageState extends State<OtaSyncPage> {
                       style: TextStyle(color: Colors.grey[600], fontSize: 12),
                     ),
                     const Divider(height: 24),
-                    _buildSyncStat('Local Database Version', 'v2.4.1 (Kolkata Core)'),
-                    _buildSyncStat('Total Indexed Routes', '2,172 Routes'),
-                    _buildSyncStat('Total Bus Stops', '1,489 Stops'),
+                    _buildSyncStat('Local Database Version', 'v${BusDataService().dataVersion} (Kolkata Core)'),
+                    _buildSyncStat('Total Indexed Routes', '${BusDataService().totalRoutesCount} Routes'),
+                    _buildSyncStat('Total Bus Stops', '${KolkataStops.totalStopsCount} Stops'),
                     _buildSyncStat('Metro Corridors', '5 Lines (50 Stations)'),
                     _buildSyncStat('Payload Encryption', 'AES-256-GCM Secure'),
-                    _buildSyncStat('Last Synchronization', _lastSync),
+                    _buildSyncStat('Last Synchronization', BusDataService().lastSyncTime),
                     const SizedBox(height: 16),
                     Text(_status, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: SettingsService().currentTheme.primary)),
                     const SizedBox(height: 16),

@@ -109,10 +109,11 @@ class _MainHomeScreenState extends State<MainHomeScreen> with SingleTickerProvid
 
   void _checkForOtaUpdates() async {
     try {
-      final syncData = await _api.checkBackgroundSync('2.4.0');
-      if (syncData['has_updates'] == true) {
+      final syncData = await _api.syncOtaInBackground();
+      if (syncData['updated'] == true && mounted) {
         setState(() {
-          _otaNotice = syncData['changelog'] ?? 'Kolkata bus route database synced via OTA.';
+          _otaNotice = syncData['changelog'] ??
+              'Synced ${syncData['total_routes']} routes offline (v${syncData['version']}).';
         });
       }
     } catch (_) {}

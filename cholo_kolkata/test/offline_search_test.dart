@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cholo_kolkata/services/bus_data_service.dart';
 import 'package:cholo_kolkata/services/kolkata_stops.dart';
 
@@ -59,5 +61,36 @@ void main() {
   test('1-transfer route finder works offline when needed', () {
     final transfers = BusDataService().searchTransfers('Baruipur', 'Dakshineswar');
     expect(transfers, isNotEmpty);
+  });
+
+  test('applyOtaBundle persists compressed routes & updates in-memory index', () async {
+    SharedPreferences.setMockInitialValues({});
+    final sampleRoutes = json.encode({
+      '99X': [
+        {
+          'id': 9999,
+          'r': '99X',
+          'f': 'Esplanade',
+          't': 'Airport',
+          'rn': 'Esplanade ➔ Airport',
+          'bt': 'AC Bus',
+          'cat': 'WBTC',
+          's': ['Esplanade', 'Ultadanga', 'Airport']
+        }
+      ]
+    });
+    final sampleStops = json.encode([
+      {'n': 'Esplanade', 'c': 450},
+      {'n': 'Airport', 'c': 85}
+    ]);
+
+    final ok = await BusDataService().applyOtaBundle(
+      version: '2.4.9',
+      routesJson: sampleRoutes,
+      stopsJson: sampleStops,
+    );
+    expect(ok, isTrue);
+    expect(BusDataService().dataVersion, '2.4.9');
+    expect(BusDataService().searchBusNumbers('99X'), isNotEmpty);
   });
 }
