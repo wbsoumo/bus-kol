@@ -1,22 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CholoKolkata - Kolkata Bus & Metro Transit</title>
-  <meta name="description" content="CholoKolkata: Where is my Bus & Kolkata Metro timings, fares, and commuter live alerts.">
+  <meta name="description"
+    content="CholoKolkata: Where is my Bus & Kolkata Metro timings, fares, and commuter live alerts.">
   <link rel="icon" href="assets/bus-logo.svg">
-  
+
   <!-- Material Android Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com">
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
+  <link
+    href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
+
   <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
 
   <!-- Android Phone Shell Frame -->
@@ -44,7 +49,8 @@
               <span>OTA SYNC</span>
             </div>
             <button id="lang-toggle-btn" class="toolbar-btn" title="Toggle English / বাংলা">বাং</button>
-            <button id="view-mode-toggle" class="toolbar-btn" title="Toggle Fullscreen / Mobile Frame"><i class="fa-solid fa-mobile-screen"></i></button>
+            <button id="view-mode-toggle" class="toolbar-btn" title="Toggle Fullscreen / Mobile Frame"><i
+                class="fa-solid fa-mobile-screen"></i></button>
           </div>
         </div>
 
@@ -76,11 +82,11 @@
 
         <!-- TAB 1: SPOT BUS SCREEN -->
         <section id="tab-spot" class="wimt-page active">
-          
+
           <!-- CARD 1: MAIN SEARCH (From ➔ To) -->
           <div class="wimt-card search-card-wimt">
             <div class="stations-input-container">
-              
+
               <!-- From Station Field -->
               <div class="station-field" id="from-field-box">
                 <span class="dot-indicator green-dot"></span>
@@ -105,7 +111,8 @@
                 <span class="dot-indicator red-dot"></span>
                 <div class="field-text-box">
                   <label for="to-input" class="station-label">To Bus Stop</label>
-                  <input type="text" id="to-input" placeholder="e.g. Sector V (Salt Lake), Esplanade" autocomplete="off">
+                  <input type="text" id="to-input" placeholder="e.g. Sector V (Salt Lake), Esplanade"
+                    autocomplete="off">
                 </div>
                 <button class="input-clear-btn" id="clear-to-btn"><i class="fa-solid fa-xmark"></i></button>
                 <div class="wimt-autocomplete" id="to-suggestions"></div>
@@ -128,7 +135,8 @@
           <!-- CARD 2: BUS NO. / NAME LOOKUP -->
           <div class="wimt-card utility-card">
             <div class="utility-card-header">
-              <span class="utility-title"><i class="fa-solid fa-hashtag" style="color: #00897B; margin-right: 6px;"></i> Bus No. / Route Name</span>
+              <span class="utility-title"><i class="fa-solid fa-hashtag" style="color: #00897B; margin-right: 6px;"></i>
+                Bus No. / Route Name</span>
             </div>
             <div class="utility-input-row">
               <input type="text" id="busno-input" placeholder="e.g. 215A, S12, AC-12, 12C, C, 44A" autocomplete="off">
@@ -139,10 +147,12 @@
           <!-- CARD 3: LIVE BUS STOP LOOKUP ("Live Station") -->
           <div class="wimt-card utility-card">
             <div class="utility-card-header">
-              <span class="utility-title"><i class="fa-solid fa-signs-post" style="color: #00897B; margin-right: 6px;"></i> Live Bus Stop Board</span>
+              <span class="utility-title"><i class="fa-solid fa-signs-post"
+                  style="color: #00897B; margin-right: 6px;"></i> Live Bus Stop Board</span>
             </div>
             <div class="utility-input-row" style="position: relative;">
-              <input type="text" id="live-stop-input" placeholder="Type bus stop (e.g. Howrah, Esplanade, Ruby)" autocomplete="off">
+              <input type="text" id="live-stop-input" placeholder="Type bus stop (e.g. Howrah, Esplanade, Ruby)"
+                autocomplete="off">
               <button id="live-stop-btn" class="utility-btn">DEPARTURES</button>
               <div class="wimt-autocomplete" id="live-stop-suggestions"></div>
             </div>
@@ -168,7 +178,8 @@
             <!-- CARD: DELHI METRO STYLE ROUTE & FARE PLANNER -->
             <div class="wimt-card metro-planner-card">
               <div class="planner-title-row">
-                <span class="planner-title"><i class="fa-solid fa-route" style="color: #00897B; margin-right: 6px;"></i> Station to Station Route Planner</span>
+                <span class="planner-title"><i class="fa-solid fa-route" style="color: #00897B; margin-right: 6px;"></i>
+                  Station to Station Route Planner</span>
               </div>
 
               <div class="stations-input-container metro-inputs">
@@ -224,9 +235,12 @@
               </div>
 
               <div class="journey-stats-row">
-                <div class="stat-pill"><i class="fa-solid fa-clock"></i> <span id="metro-res-duration">8 mins</span></div>
-                <div class="stat-pill"><i class="fa-solid fa-landmark"></i> <span id="metro-res-stations">4 Stations</span></div>
-                <div class="stat-pill"><i class="fa-solid fa-road"></i> <span id="metro-res-distance">4.8 km</span></div>
+                <div class="stat-pill"><i class="fa-solid fa-clock"></i> <span id="metro-res-duration">8 mins</span>
+                </div>
+                <div class="stat-pill"><i class="fa-solid fa-landmark"></i> <span id="metro-res-stations">4
+                    Stations</span></div>
+                <div class="stat-pill"><i class="fa-solid fa-road"></i> <span id="metro-res-distance">4.8 km</span>
+                </div>
               </div>
 
               <div class="interchange-banner hidden" id="metro-res-interchange">
@@ -278,12 +292,15 @@
             <!-- POST ALERT COMPOSER CARD -->
             <div class="wimt-card chat-composer-card">
               <div class="composer-header">
-                <span><i class="fa-solid fa-bullhorn" style="color: #00897B; margin-right: 6px;"></i> Post Live Commuter Update</span>
+                <span><i class="fa-solid fa-bullhorn" style="color: #00897B; margin-right: 6px;"></i> Post Live Commuter
+                  Update</span>
               </div>
 
               <div class="composer-inputs-grid">
-                <input type="text" id="chat-user-input" placeholder="Your Name / Handle (e.g. Sourav_Garia)" class="chat-input-text" maxlength="30">
-                <input type="text" id="chat-route-input" placeholder="Bus No. or Area (e.g. 215A, Karunamoyee)" class="chat-input-text" maxlength="30">
+                <input type="text" id="chat-user-input" placeholder="Your Name / Handle (e.g. Sourav_Garia)"
+                  class="chat-input-text" maxlength="30">
+                <input type="text" id="chat-route-input" placeholder="Bus No. or Area (e.g. 215A, Karunamoyee)"
+                  class="chat-input-text" maxlength="30">
               </div>
 
               <!-- STATUS CHIPS SELECTOR -->
@@ -295,7 +312,9 @@
               </div>
 
               <div class="composer-submit-row">
-                <input type="text" id="chat-msg-input" placeholder="Share live status (e.g. Light traffic near Karunamoyee, bus departed 2 mins ago)" class="chat-msg-text" maxlength="160">
+                <input type="text" id="chat-msg-input"
+                  placeholder="Share live status (e.g. Light traffic near Karunamoyee, bus departed 2 mins ago)"
+                  class="chat-msg-text" maxlength="160">
                 <button id="chat-post-btn" class="chat-send-btn" title="Post Live Update">
                   <i class="fa-solid fa-paper-plane"></i>
                 </button>
@@ -306,7 +325,8 @@
             <div class="chat-feed-section">
               <div class="feed-header-row">
                 <span><i class="fa-solid fa-clock-rotate-left"></i> RECENT UPDATES</span>
-                <button id="chat-refresh-btn" class="chat-refresh-action"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                <button id="chat-refresh-btn" class="chat-refresh-action"><i class="fa-solid fa-rotate"></i>
+                  Refresh</button>
               </div>
 
               <div id="chat-messages-list" class="chat-messages-container">
@@ -329,7 +349,8 @@
             <div id="empty-favs" class="empty-placeholder">
               <i class="fa-regular fa-star" style="font-size: 2.2rem; color: #B0BEC5;"></i>
               <h4>No Starred Routes Yet</h4>
-              <p>Tap the <strong>⭐ Star icon</strong> on any bus result to save your daily commute for instant tracking.</p>
+              <p>Tap the <strong>⭐ Star icon</strong> on any bus result to save your daily commute for instant tracking.
+              </p>
             </div>
           </div>
         </section>
@@ -343,7 +364,7 @@
     <!-- (Opens as a full new screen just like Where is My Train) -->
     <!-- ======================================================== -->
     <div id="screen-results" class="wimt-app-screen">
-      
+
       <!-- Results Full Screen Top Header Bar -->
       <header class="results-screen-header">
         <button id="results-back-btn" class="header-back-arrow" title="Back to Search">
@@ -390,7 +411,7 @@
           <button class="sheet-back-arrow" id="sheet-close-btn" title="Back">
             <i class="fa-solid fa-arrow-left"></i>
           </button>
-          
+
           <div class="sheet-train-info">
             <div class="train-badge-row">
               <span class="bus-number-chip" id="modal-route-no">215A</span>
@@ -475,4 +496,5 @@
 
   <script src="js/app.js"></script>
 </body>
+
 </html>
