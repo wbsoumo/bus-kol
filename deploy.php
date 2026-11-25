@@ -181,8 +181,11 @@ if ($chosen_python) {
 
     $req_path = $workdir . '/requirements.txt';
     if (file_exists($req_path)) {
-        log_msg('info', "Installing requirements (Flask, PyMySQL, Cryptography)...");
-        run_cmd_fast("$pip_bin install -r " . escapeshellarg($req_path) . " 2>&1");
+        log_msg('info', "Installing requirements into venv and user site-packages...");
+        if (file_exists($workdir . '/venv/bin/pip')) {
+            run_cmd_fast($workdir . "/venv/bin/pip install -r " . escapeshellarg($req_path) . " 2>&1");
+        }
+        run_cmd_fast("$pip_bin install --user -r " . escapeshellarg($req_path) . " 2>&1");
         log_msg('success', "✓ Dependencies verified.");
     }
 } else {
