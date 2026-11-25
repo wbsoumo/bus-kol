@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <circle cx="24" cy="24" r="22" fill="#0288D1"/>
+  <!-- Front train stylized -->
+  <path d="M14 14 C14 10, 34 10, 34 14 L34 30 C34 33, 30 35, 24 35 C18 35, 14 33, 14 30 Z" fill="#FFFFFF"/>
+  <!-- Metro Windshield -->
+  <path d="M16 16 L32 16 L32 23 L16 23 Z" fill="#0277BD" rx="2"/>
+  <!-- Metro lights -->
+  <circle cx="18" cy="28" r="2" fill="#FFEB3B"/>
+  <circle cx="30" cy="28" r="2" fill="#FFEB3B"/>
+  <!-- Tracks -->
+  <line x1="12" y1="39" x2="36" y2="39" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="18" y1="36" x2="16" y2="42" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+  <line x1="30" y1="36" x2="32" y2="42" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+</svg>
+

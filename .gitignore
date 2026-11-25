@@ -1,0 +1,33 @@
+# System & OS
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+busrepo_source/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+.env.local
+
+# Flutter / Dart Build & Temp Cache
+cholo_kolkata/build/
+cholo_kolkata/.dart_tool/
+cholo_kolkata/android/.gradle/
+cholo_kolkata/android/local.properties
+cholo_kolkata/android/app/build/
+cholo_kolkata/ios/.symlinks/
+cholo_kolkata/ios/Pods/
+cholo_kolkata/.flutter-plugins-dependencies
+cholo_kolkata/.pub-cache/
+
+# Database local binary files (SQL dumps helnovexaa_buskolkata.sql & database_dump.sql are tracked)
+kolkata_bus.db
+
+# Explicitly ensure .env and config files are tracked as requested by user
+!.env
+!.env.example
+!config.py

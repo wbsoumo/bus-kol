@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+    <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000" flood-opacity="0.35"/>
+  </filter>
+  <g filter="url(#shadow)">
+    <!-- Bus Body (Kolkata Classic Blue & Yellow or WIMT Teal) -->
+    <rect x="5" y="4" width="22" height="21" rx="4" fill="#00897B" stroke="#004D40" stroke-width="1.2"/>
+    <!-- Windshield -->
+    <rect x="7" y="7" width="18" height="8" rx="1.5" fill="#E0F2F1"/>
+    <line x1="16" y1="7" x2="16" y2="15" stroke="#00897B" stroke-width="1"/>
+    <!-- Destination Board -->
+    <rect x="10" y="3" width="12" height="3" rx="0.5" fill="#FFC107"/>
+    <!-- Lights -->
+    <circle cx="9" cy="19" r="1.8" fill="#FFF59D" stroke="#FFA000" stroke-width="0.6"/>
+    <circle cx="23" cy="19" r="1.8" fill="#FFF59D" stroke="#FFA000" stroke-width="0.6"/>
+    <!-- Grille -->
+    <line x1="13" y1="18.5" x2="19" y2="18.5" stroke="#E0F2F1" stroke-width="1" stroke-linecap="round"/>
+    <line x1="14" y1="20.5" x2="18" y2="20.5" stroke="#E0F2F1" stroke-width="1" stroke-linecap="round"/>
+    <!-- Bumper -->
+    <rect x="6" y="22" width="20" height="2.2" rx="1" fill="#37474F"/>
+    <!-- Wheels -->
+    <rect x="6" y="24" width="3.5" height="3" rx="0.8" fill="#212121"/>
+    <rect x="22.5" y="24" width="3.5" height="3" rx="0.8" fill="#212121"/>
+  </g>
+</svg>
+
