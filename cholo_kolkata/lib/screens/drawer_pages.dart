@@ -732,3 +732,189 @@ class PrivacyPolicyPage extends StatelessWidget {
     );
   }
 }
+
+// ==========================================
+// 7. METRO DIRECTORY & TIMINGS PAGE
+// ==========================================
+class MetroDirectoryPage extends StatelessWidget {
+  const MetroDirectoryPage({super.key});
+
+  Color _hexToColor(String hex) {
+    hex = hex.replaceAll('#', '');
+    if (hex.length == 6) hex = 'FF$hex';
+    return Color(int.tryParse(hex, radix: 16) ?? 0xFF00897B);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = [
+      {
+        'num': '1',
+        'name': 'Blue Line (North-South Corridor)',
+        'color': '#1976D2',
+        'from': 'Dakshineswar',
+        'to': 'Kavi Subhash (New Garia)',
+        'stations': '26 Stations',
+        'first': '06:50 AM',
+        'last': '09:40 PM',
+        'peak': 'Every 5-6 mins',
+        'offpeak': 'Every 8-10 mins',
+        'feature': 'First Metro Line in India (1984) connecting North & South Kolkata',
+      },
+      {
+        'num': '2',
+        'name': 'Green Line (Underwater Ganga Section)',
+        'color': '#2E7D32',
+        'from': 'Howrah Maidan',
+        'to': 'Esplanade',
+        'stations': '4 Stations',
+        'first': '07:00 AM',
+        'last': '09:45 PM',
+        'peak': 'Every 10-12 mins',
+        'offpeak': 'Every 15 mins',
+        'feature': 'India’s 1st Underwater Metro Tunnel passing 33m under the Hooghly River',
+      },
+      {
+        'num': '2',
+        'name': 'Green Line (East-West Sector V Section)',
+        'color': '#2E7D32',
+        'from': 'Sealdah',
+        'to': 'Salt Lake Sector V',
+        'stations': '8 Stations',
+        'first': '06:55 AM',
+        'last': '09:40 PM',
+        'peak': 'Every 10-12 mins',
+        'offpeak': 'Every 15-20 mins',
+        'feature': 'Direct high-speed connectivity to Kolkata IT Hub & Salt Lake Stadium',
+      },
+      {
+        'num': '3',
+        'name': 'Purple Line (Southwest Corridor)',
+        'color': '#7B1FA2',
+        'from': 'Joka',
+        'to': 'Majerhat',
+        'stations': '7 Stations',
+        'first': '08:30 AM',
+        'last': '03:35 PM',
+        'peak': 'Every 25 mins',
+        'offpeak': 'Every 35 mins',
+        'feature': 'Elevated Diamond Harbour Rd Corridor serving IIM Calcutta & Taratala',
+      },
+      {
+        'num': '6',
+        'name': 'Orange Line (EM Bypass Corridor)',
+        'color': '#E65100',
+        'from': 'Kavi Subhash (New Garia)',
+        'to': 'Hemanta Mukherjee (Ruby)',
+        'stations': '5 Stations',
+        'first': '09:00 AM',
+        'last': '04:40 PM',
+        'peak': 'Every 20 mins',
+        'offpeak': 'Every 24 mins',
+        'feature': 'Seamless interchange with Line 1 at New Garia along EM Bypass',
+      },
+    ];
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF00695C),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Metro Directory & Timings',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(14),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0F2F1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF80CBC4)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.subway, color: Color(0xFF00695C), size: 24),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Official Kolkata Metro Rail Corporation (KMRC) Network & Timings Directory',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF004D40)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          ...lines.map((l) {
+            final lineColor = _hexToColor(l['color']!);
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              elevation: 1.5,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: BorderSide(color: lineColor.withOpacity(0.5), width: 1.5),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: lineColor, borderRadius: BorderRadius.circular(4)),
+                          child: Text('Line ${l['num']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            l['name']!,
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: lineColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text('${l['from']} ⇄ ${l['to']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B))),
+                    const SizedBox(height: 3),
+                    Text('${l['stations']} • ${l['feature']}', style: TextStyle(color: Colors.grey[700], fontSize: 11, height: 1.3)),
+                    const Divider(height: 18),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildTimingsCol('FIRST TRAIN', l['first']!),
+                        _buildTimingsCol('LAST TRAIN', l['last']!),
+                        _buildTimingsCol('PEAK FREQ', l['peak']!),
+                        _buildTimingsCol('OFF-PEAK', l['offpeak']!),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimingsCol(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 9, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 2),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF1E293B))),
+      ],
+    );
+  }
+}

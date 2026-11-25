@@ -13,6 +13,10 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.Build
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import io.flutter.embedding.android.FlutterActivity
@@ -25,13 +29,56 @@ class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.cholokolkata/live_notification"
     private val NOTIFICATION_CHANNEL_ID = "cholo_kolkata_live_tracking"
 
+    private var pendingRouteNo: String? = null
+    private var pendingRouteId: Int? = null
+    private var methodChannel: MethodChannel? = null
+
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleNotificationIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNotificationIntent(intent)
+    }
+
+    private fun handleNotificationIntent(intent: Intent?) {
+        if (intent?.getStringExtra("navigate_to") == "live_track") {
+            val rNo = intent.getStringExtra("route_no")
+            val rId = intent.getIntExtra("route_id", 0)
+            pendingRouteNo = rNo
+            pendingRouteId = rId
+            if (rNo != null) {
+                methodChannel?.invokeMethod(
+                    "onNotificationOpened",
+                    mapOf("routeNo" to rNo, "routeId" to rId)
+                )
+            }
+        }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
         createNotificationChannel()
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        methodChannel = channel
+
+        channel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "getInitialNotificationPayload" -> {
+                    if (pendingRouteNo != null) {
+                        val map = mapOf("routeNo" to pendingRouteNo, "routeId" to pendingRouteId)
+                        pendingRouteNo = null
+                        pendingRouteId = null
+                        result.success(map)
+                    } else {
+                        result.success(null)
+                    }
+                }
                 "showCustomLiveNotification" -> {
                     val id = call.argument<Int>("id") ?: 818
                     val routeNo = call.argument<String>("routeNo") ?: ""
@@ -108,12 +155,12 @@ class MainActivity : FlutterActivity() {
             progress = progress.coerceIn(0.05f, 0.95f)
         )
 
-        // 2. Generate the circular vehicle badge for largeIcon
-        val busBadgeBitmap = createCircleBusBitmap()
-
-        // 3. Intents for interaction
+        // 2. Intents for interaction
         val contentIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("navigate_to", "live_track")
+            putExtra("route_id", id)
+            putExtra("route_no", routeNo)
         }
         val contentPendingIntent = PendingIntent.getActivity(
             this, id, contentIntent,
@@ -138,21 +185,24 @@ class MainActivity : FlutterActivity() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = "$distStr to $nextStop"
+        val titleRaw = "$distStr to $nextStop"
+        val titleSpan = SpannableString(titleRaw).apply {
+            setSpan(StyleSpan(Typeface.BOLD), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            setSpan(RelativeSizeSpan(1.22f), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
         val summary = speedStr
 
-        // 4. Build Notification with BigPictureStyle & Native Action Buttons
-        // This guarantees wide rectangular rendering, matching Where Is My Train exactly
+        // 3. Build Notification with BigPictureStyle & Native Action Buttons
+        // Full wide rectangular layout matching Where Is My Train exactly (no largeIcon clutter on the right)
         val bigPictureStyle = NotificationCompat.BigPictureStyle()
             .bigPicture(cardBitmap)
-            .setBigContentTitle(title)
+            .setBigContentTitle(titleSpan)
             .setSummaryText(summary)
 
         val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_bus_circle)
-            .setLargeIcon(busBadgeBitmap)
+            .setSmallIcon(R.drawable.ic_bus_white)
             .setSubText(routeNo)
-            .setContentTitle(title)
+            .setContentTitle(titleSpan)
             .setContentText(summary)
             .setStyle(bigPictureStyle)
             .addAction(0, "Set alarm", alarmPendingIntent)
@@ -216,10 +266,10 @@ class MainActivity : FlutterActivity() {
 
     /**
      * Draws the exact Where Is My Train Trip Card:
-     * - Wide horizontal rectangular layout (960 x 320 px)
-     * - Dark rounded card background (#211523)
-     * - Origin (top left) & Destination (top right)
-     * - Horizontal transit rail track with white terminal dot
+     * - Wide horizontal rectangular layout (1040 x 340 px)
+     * - Dark rounded card background (#201422) matching WIMT charcoal-violet
+     * - Origin (top left) & Destination (top right) in bold white
+     * - Horizontal transit rail track (#633934) with white terminal dot
      * - Circular Blue Bus Pin traveling along the track at exact progress %
      * - Remaining ETA (bottom left) & Scheduled Arrival time (bottom right)
      */
@@ -230,14 +280,14 @@ class MainActivity : FlutterActivity() {
         arrivalTimeStr: String,
         progress: Float
     ): Bitmap {
-        val width = 960
-        val height = 320
+        val width = 1040
+        val height = 340
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
         // 1. Dark Card Background with Rounded Corners
         val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#211523") // Exact dark charcoal-violet from WIMT
+            color = Color.parseColor("#201422") // Exact dark charcoal-violet from WIMT
             style = Paint.Style.FILL
         }
         val cardRect = RectF(0f, 0f, width.toFloat(), height.toFloat())
@@ -246,22 +296,22 @@ class MainActivity : FlutterActivity() {
         // 2. Top Labels: Origin (Left) & Destination (Right)
         val topTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = 34f
+            textSize = 36f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
 
-        val cleanOrigin = if (origin.length > 22) origin.substring(0, 20) + "..." else origin
-        val cleanDest = if (destination.length > 20) destination.substring(0, 18) + "..." else destination
+        val cleanOrigin = if (origin.length > 24) origin.substring(0, 22) + "..." else origin
+        val cleanDest = if (destination.length > 22) destination.substring(0, 20) + "..." else destination
 
-        canvas.drawText(cleanOrigin, 46f, 74f, topTextPaint)
+        canvas.drawText(cleanOrigin, 48f, 76f, topTextPaint)
 
         val destWidth = topTextPaint.measureText(cleanDest)
-        canvas.drawText(cleanDest, width - 46f - destWidth, 74f, topTextPaint)
+        canvas.drawText(cleanDest, width - 48f - destWidth, 76f, topTextPaint)
 
         // 3. Horizontal Transit Track Line
-        val trackStartX = 52f
-        val trackEndX = width - 52f
-        val trackY = 160f
+        val trackStartX = 54f
+        val trackEndX = width - 54f
+        val trackY = 172f
 
         val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#633934") // Rich warm brown rail color from WIMT
@@ -276,7 +326,7 @@ class MainActivity : FlutterActivity() {
             color = Color.WHITE
             style = Paint.Style.FILL
         }
-        canvas.drawCircle(trackEndX, trackY, 7f, endDotPaint)
+        canvas.drawCircle(trackEndX, trackY, 8f, endDotPaint)
 
         // 4. Moving Circular Vehicle Pin along the Track Line
         val busX = trackStartX + progress * (trackEndX - trackStartX)
@@ -286,14 +336,14 @@ class MainActivity : FlutterActivity() {
             color = Color.WHITE
             style = Paint.Style.FILL
         }
-        canvas.drawCircle(busX, trackY, 26f, pinBorderPaint)
+        canvas.drawCircle(busX, trackY, 28f, pinBorderPaint)
 
         // Blue Inner Circle Badge
         val pinInnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#0288D1") // Blue badge matching WIMT
             style = Paint.Style.FILL
         }
-        canvas.drawCircle(busX, trackY, 22f, pinInnerPaint)
+        canvas.drawCircle(busX, trackY, 24f, pinInnerPaint)
 
         // Bus Icon Glyphs inside the badge
         val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -301,34 +351,34 @@ class MainActivity : FlutterActivity() {
             style = Paint.Style.FILL
         }
         // Bus body
-        val busRect = RectF(busX - 11f, trackY - 12f, busX + 11f, trackY + 9f)
-        canvas.drawRoundRect(busRect, 3.5f, 3.5f, iconPaint)
+        val busRect = RectF(busX - 12f, trackY - 13f, busX + 12f, trackY + 10f)
+        canvas.drawRoundRect(busRect, 4f, 4f, iconPaint)
 
         // Windshield
         val windowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#0288D1")
             style = Paint.Style.FILL
         }
-        val windowRect = RectF(busX - 8.5f, trackY - 10f, busX + 8.5f, trackY - 2.5f)
+        val windowRect = RectF(busX - 9f, trackY - 11f, busX + 9f, trackY - 3f)
         canvas.drawRoundRect(windowRect, 2f, 2f, windowPaint)
 
         // Wheels
-        canvas.drawCircle(busX - 6f, trackY + 11f, 2.5f, iconPaint)
-        canvas.drawCircle(busX + 6f, trackY + 11f, 2.5f, iconPaint)
+        canvas.drawCircle(busX - 6.5f, trackY + 12f, 3f, iconPaint)
+        canvas.drawCircle(busX + 6.5f, trackY + 12f, 3f, iconPaint)
 
         // 5. Bottom Labels: ETA (Left) & Scheduled Arrival (Right)
         val bottomTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = 32f
+            textSize = 34f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
 
         val cleanEta = if (etaStr.isNotEmpty()) etaStr else "On Schedule"
-        canvas.drawText(cleanEta, 46f, 256f, bottomTextPaint)
+        canvas.drawText(cleanEta, 48f, 276f, bottomTextPaint)
 
         val cleanArrival = if (arrivalTimeStr.isNotEmpty()) arrivalTimeStr else "In Transit"
         val arrivalWidth = bottomTextPaint.measureText(cleanArrival)
-        canvas.drawText(cleanArrival, width - 46f - arrivalWidth, 256f, bottomTextPaint)
+        canvas.drawText(cleanArrival, width - 48f - arrivalWidth, 276f, bottomTextPaint)
 
         return bitmap
     }

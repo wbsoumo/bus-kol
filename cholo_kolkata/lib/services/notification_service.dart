@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
@@ -8,9 +9,29 @@ class NotificationService {
   NotificationService._internal();
 
   static const MethodChannel _channel = MethodChannel('com.cholokolkata/live_notification');
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+  Function(Map<String, dynamic>)? onNotificationClicked;
 
   Future<void> init() async {
-    // Channel initialization handled natively
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onNotificationOpened') {
+        final data = Map<String, dynamic>.from(call.arguments as Map);
+        onNotificationClicked?.call(data);
+      }
+    });
+  }
+
+  Future<Map<String, dynamic>?> checkInitialNotification() async {
+    try {
+      if (Platform.isAndroid) {
+        final res = await _channel.invokeMethod('getInitialNotificationPayload');
+        if (res != null) {
+          return Map<String, dynamic>.from(res as Map);
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// Show or dynamically update ongoing Where Is My Train custom UI Live Notification

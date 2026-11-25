@@ -219,26 +219,60 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
           timeLimit: Duration(seconds: 5),
         ),
       );
+
+      // Check distance from user's current GPS position to the route stops
+      double realDistance = double.infinity;
+      for (int i = 0; i < activeStops.length; i++) {
+        final stopCoord = KolkataGeo.resolveCoordinate(
+          activeStops[i]['stop_name'] ?? '',
+          i,
+          activeStops.length,
+        );
+        final d = _haversineKm(pos.latitude, pos.longitude, stopCoord.latitude, stopCoord.longitude);
+        if (d < realDistance) {
+          realDistance = d;
+        }
+      }
+
+      // If user's location is far away from the bus route (> 1.5 km), auto turn off & alert
+      if (realDistance > 1.5) {
+        _trackingTimer?.cancel();
+        await _notifications.cancelNotification(widget.routeId);
+        if (mounted) {
+          setState(() {
+            _isInsideBus = false;
+            _nearestStopIdx = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFFD32F2F),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              content: Row(
+                children: [
+                  const Icon(Icons.location_off, color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Looks like you are not on Bus ${widget.routeNo} right now (${realDistance.toStringAsFixed(1)} km away). Live tracking turned off.',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
+
       lat = pos.latitude;
       lng = pos.longitude;
       speedKmh = pos.speed * 3.6;
       if (speedKmh.isNaN || speedKmh < 0) speedKmh = 0.0;
-
-      // Validate within Greater Kolkata bounds
-      final bool isKolkata = lat >= 22.0 && lat <= 23.2 && lng >= 88.0 && lng <= 89.0;
-      if (!isKolkata) {
-        final baseIdx = _nearestStopIdx ?? _fromIdx;
-        final pt = KolkataGeo.resolveCoordinate(
-          activeStops[baseIdx < activeStops.length ? baseIdx : 0]['stop_name'] ?? '',
-          baseIdx,
-          activeStops.length,
-        );
-        lat = pt.latitude;
-        lng = pt.longitude;
-        speedKmh = 26.0;
-      }
     } catch (_) {
-      // Fallback if indoor/emulator: resolve near boarding or current stop
+      // Fallback if indoor/mock: resolve near boarding or current stop
       final baseIdx = _nearestStopIdx ?? _fromIdx;
       final pt = KolkataGeo.resolveCoordinate(
         activeStops[baseIdx < activeStops.length ? baseIdx : 0]['stop_name'] ?? '',

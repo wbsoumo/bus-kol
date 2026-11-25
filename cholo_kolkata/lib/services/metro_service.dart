@@ -594,6 +594,12 @@ class MetroService {
         lineName: s1.lineName,
         lineColor: s1.lineColor,
         stations: path,
+        leg1LineName: s1.lineName,
+        leg1LineColor: s1.lineColor,
+        leg1Stations: path,
+        leg2LineName: null,
+        leg2LineColor: null,
+        leg2Stations: const [],
         instructions: 'Direct train on ${s1.lineName}. No interchange needed.',
       );
     }
@@ -649,6 +655,12 @@ class MetroService {
       lineName: '${s1.lineName} ➔ ${s2.lineName}',
       lineColor: s1.lineColor,
       stations: combinedStations,
+      leg1LineName: s1.lineName,
+      leg1LineColor: s1.lineColor,
+      leg1Stations: leg1,
+      leg2LineName: s2.lineName,
+      leg2LineColor: s2.lineColor,
+      leg2Stations: leg2,
       instructions: 'Take ${s1.lineName} to $interchange. Change train to ${s2.lineName} towards $to.',
     );
   }

@@ -3,6 +3,7 @@ import 'screens/spot_bus_screen.dart';
 import 'screens/metro_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/drawer_pages.dart';
+import 'screens/live_track_sheet.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
 
@@ -19,6 +20,7 @@ class CholoKolkataApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'CholoKolkata',
+      navigatorKey: NotificationService.navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -54,6 +56,34 @@ class _MainHomeScreenState extends State<MainHomeScreen> with SingleTickerProvid
     // Only 2 Top Tabs: BUSES and METRO (Where is My Train exact model)
     _tabController = TabController(length: 2, vsync: this);
     _checkForOtaUpdates();
+
+    // Listen for notification clicks to deep-link directly to live track screen
+    NotificationService().onNotificationClicked = (data) {
+      _navigateToLiveTrack(data);
+    };
+    NotificationService().checkInitialNotification().then((data) {
+      if (data != null && mounted) {
+        _navigateToLiveTrack(data);
+      }
+    });
+  }
+
+  void _navigateToLiveTrack(Map<String, dynamic> data) {
+    final routeNo = data['routeNo']?.toString() ?? '';
+    final routeId = (data['routeId'] is num)
+        ? (data['routeId'] as num).toInt()
+        : (int.tryParse(data['routeId']?.toString() ?? '818') ?? 818);
+    if (routeNo.isNotEmpty) {
+      NotificationService.navigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (_) => LiveTrackScreen(
+            routeId: routeId,
+            routeNo: routeNo,
+            busType: 'City Bus',
+          ),
+        ),
+      );
+    }
   }
 
   void _checkForOtaUpdates() async {
@@ -191,6 +221,15 @@ class _MainHomeScreenState extends State<MainHomeScreen> with SingleTickerProvid
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const FareChartPage()));
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.subway, color: Color(0xFF00695C)),
+                    title: const Text('Metro Lines & Timings Directory', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    subtitle: const Text('Blue, Green, Purple & Orange Corridors', style: TextStyle(fontSize: 11)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MetroDirectoryPage()));
                     },
                   ),
                   ListTile(

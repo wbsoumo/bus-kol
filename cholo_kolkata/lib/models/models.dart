@@ -218,6 +218,12 @@ class MetroPlan {
   final String? lineName;
   final String? lineColor;
   final List<MetroStation> stations;
+  final String? leg1LineName;
+  final String? leg1LineColor;
+  final List<MetroStation> leg1Stations;
+  final String? leg2LineName;
+  final String? leg2LineColor;
+  final List<MetroStation> leg2Stations;
 
   MetroPlan({
     required this.type,
@@ -233,10 +239,18 @@ class MetroPlan {
     this.lineName,
     this.lineColor,
     this.stations = const [],
+    this.leg1LineName,
+    this.leg1LineColor,
+    this.leg1Stations = const [],
+    this.leg2LineName,
+    this.leg2LineColor,
+    this.leg2Stations = const [],
   });
 
   factory MetroPlan.fromJson(Map<String, dynamic> json) {
     var rawStns = json['stations'] as List? ?? [];
+    var rawLeg1 = json['leg1_stations'] as List? ?? [];
+    var rawLeg2 = json['leg2_stations'] as List? ?? [];
     return MetroPlan(
       type: json['type']?.toString() ?? 'DIRECT',
       fromStation: json['from_station']?.toString() ?? '',
@@ -259,6 +273,12 @@ class MetroPlan {
       lineName: json['line_name']?.toString(),
       lineColor: json['line_color']?.toString(),
       stations: rawStns.map((s) => MetroStation.fromJson(s)).toList(),
+      leg1LineName: json['leg1_line_name']?.toString(),
+      leg1LineColor: json['leg1_line_color']?.toString(),
+      leg1Stations: rawLeg1.map((s) => MetroStation.fromJson(s)).toList(),
+      leg2LineName: json['leg2_line_name']?.toString(),
+      leg2LineColor: json['leg2_line_color']?.toString(),
+      leg2Stations: rawLeg2.map((s) => MetroStation.fromJson(s)).toList(),
     );
   }
 }
