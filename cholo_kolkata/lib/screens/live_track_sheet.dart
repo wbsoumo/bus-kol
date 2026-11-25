@@ -73,6 +73,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
   void _preloadLocalDetails() {
     final localData = BusDataService().getRouteDetails(
       widget.routeNo,
+      routeId: widget.routeId,
       from: widget.initialFrom,
       to: widget.initialTo,
       busType: widget.busType,
@@ -138,6 +139,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
   void _tryLocalFallback() {
     final localData = BusDataService().getRouteDetails(
       widget.routeNo,
+      routeId: widget.routeId,
       from: widget.initialFrom,
       to: widget.initialTo,
       busType: widget.busType,

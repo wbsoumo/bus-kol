@@ -78,34 +78,94 @@ class KolkataStops {
     BusStopItem(name: 'Golpark', bengaliName: 'গোলপার্ক', subtitle: 'Ramakrishna Mission Circle', routesCount: 130),
   ];
 
-  /// Instant local fuzzy match (0ms latency, 100% offline resilient)
-  static List<BusStopItem> searchLocal(String query, {int limit = 12}) {
+  /// Complete offline stop directory (2,327+ stops populated from assets/kolkata_stops.json)
+  static List<BusStopItem> _allStops = [];
+  static Map<String, BusStopItem> _popularByKey = {
+    for (final s in popularStops) s.name.toLowerCase(): s,
+  };
+
+  static int get totalStopsCount => _allStops.isNotEmpty ? _allStops.length : popularStops.length;
+
+  /// Registers the full stop directory loaded at startup by BusDataService.
+  static void setAllStops(List<BusStopItem> stops) {
+    final Map<String, BusStopItem> merged = {};
+    for (final s in popularStops) {
+      merged[s.name.toLowerCase()] = s;
+    }
+    for (final s in stops) {
+      final key = s.name.toLowerCase();
+      final existing = merged[key];
+      if (existing != null) {
+        // Keep Bengali name and rich subtitle from popularStops, update count if larger
+        merged[key] = BusStopItem(
+          name: existing.name,
+          bengaliName: existing.bengaliName,
+          subtitle: existing.subtitle,
+          routesCount: s.routesCount > existing.routesCount ? s.routesCount : existing.routesCount,
+        );
+      } else {
+        merged[key] = s;
+      }
+    }
+    _popularByKey = {
+      for (final s in popularStops) s.name.toLowerCase(): merged[s.name.toLowerCase()] ?? s,
+    };
+    _allStops = merged.values.toList()
+      ..sort((a, b) {
+        final cmp = b.routesCount.compareTo(a.routesCount);
+        if (cmp != 0) return cmp;
+        return a.name.length.compareTo(b.name.length);
+      });
+  }
+
+  static String _normalizeStopQuery(String query) {
+    var q = query.replaceAll(RegExp(r'\s*\([^)]*\)\s*'), ' ').trim().toLowerCase();
+    const aliases = {
+      'sector 5': 'sector v',
+      'sector-5': 'sector v',
+      'saltlake': 'sector v',
+      'salt lake': 'sector v',
+      'howrah stn': 'howrah',
+      'howrah station': 'howrah',
+      'sealdah stn': 'sealdah',
+      'sealdah station': 'sealdah',
+      'hwh': 'howrah',
+      'sda': 'sealdah',
+    };
+    return aliases[q] ?? q;
+  }
+
+  /// Instant local fuzzy match across all 2,327+ stops (0ms latency, 100% offline)
+  static List<BusStopItem> searchLocal(String query, {int limit = 15}) {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) {
-      return popularStops.take(limit).toList();
+      return popularStops.map((s) => _popularByKey[s.name.toLowerCase()] ?? s).take(limit).toList();
     }
 
-    // 1. Prefix matches (e.g. "how" -> Howrah Station first)
+    final normQ = _normalizeStopQuery(q);
+    final source = _allStops.isNotEmpty ? _allStops : popularStops;
+
     final prefix = <BusStopItem>[];
-    // 2. Contains matches (e.g. "sec" -> Falta Sector 1)
     final contains = <BusStopItem>[];
 
-    for (final stop in popularStops) {
+    for (final stop in source) {
       final nameLower = stop.name.toLowerCase();
       final bengaliLower = stop.bengaliName.toLowerCase();
       final subLower = stop.subtitle.toLowerCase();
 
-      if (nameLower.startsWith(q) || bengaliLower.startsWith(q)) {
+      if (nameLower.startsWith(q) ||
+          (normQ != q && nameLower.startsWith(normQ)) ||
+          (bengaliLower.isNotEmpty && bengaliLower.startsWith(q))) {
         prefix.add(stop);
-      } else if (nameLower.contains(q) || bengaliLower.contains(q) || subLower.contains(q)) {
+      } else if (nameLower.contains(q) ||
+          (normQ != q && nameLower.contains(normQ)) ||
+          (bengaliLower.isNotEmpty && bengaliLower.contains(q)) ||
+          (subLower.isNotEmpty && subLower.contains(q))) {
         contains.add(stop);
       }
     }
 
-    prefix.sort((a, b) => b.routesCount.compareTo(a.routesCount));
-    contains.sort((a, b) => b.routesCount.compareTo(a.routesCount));
-
-    return [...prefix, ...contains].take(limit).toList();
+    final results = <BusStopItem>[...prefix, ...contains];
+    return results.take(limit).toList();
   }
 }
-

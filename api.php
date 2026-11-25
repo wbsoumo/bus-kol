@@ -18,7 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // 256-bit AES-GCM Transit Security Key
 define('TRANSIT_SECURITY_KEY', 'KolkataTransitSecureKey2026WIMT!');
 
-function secure_encrypt($payload) {
+function secure_encrypt($payload)
+{
     $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
     $key = TRANSIT_SECURITY_KEY;
     $nonce = openssl_random_pseudo_bytes(12);
@@ -27,7 +28,8 @@ function secure_encrypt($payload) {
     return ['p' => base64_encode($nonce . $ciphertext . $tag)];
 }
 
-function get_db() {
+function get_db()
+{
     $host = 'localhost';
     $user = 'helnovexaa_bus';
     $pass = 'Soumojit1234@';
@@ -48,33 +50,49 @@ function get_db() {
     return $conn;
 }
 
-function calculate_bus_fare($bus_type, $total_stops) {
-    $stops = max(1, (int)$total_stops);
+function calculate_bus_fare($bus_type, $total_stops)
+{
+    $stops = max(1, (int) $total_stops);
     $type = strtolower($bus_type ?? '');
     if (strpos($type, 'ac') !== false || strpos($type, 'volvo') !== false) {
-        if ($stops <= 5) return 25;
-        if ($stops <= 12) return 35;
-        if ($stops <= 20) return 45;
+        if ($stops <= 5)
+            return 25;
+        if ($stops <= 12)
+            return 35;
+        if ($stops <= 20)
+            return 45;
         return 60;
     }
-    if ($stops <= 4) return 10;
-    if ($stops <= 8) return 12;
-    if ($stops <= 14) return 15;
-    if ($stops <= 20) return 18;
+    if ($stops <= 4)
+        return 10;
+    if ($stops <= 8)
+        return 12;
+    if ($stops <= 14)
+        return 15;
+    if ($stops <= 20)
+        return 18;
     return 20;
 }
 
-function calculate_metro_fare($distance_km) {
-    if ($distance_km <= 2.0) return 5;
-    if ($distance_km <= 5.0) return 10;
-    if ($distance_km <= 10.0) return 15;
-    if ($distance_km <= 20.0) return 20;
-    if ($distance_km <= 25.0) return 25;
+function calculate_metro_fare($distance_km)
+{
+    if ($distance_km <= 2.0)
+        return 5;
+    if ($distance_km <= 5.0)
+        return 10;
+    if ($distance_km <= 10.0)
+        return 15;
+    if ($distance_km <= 20.0)
+        return 20;
+    if ($distance_km <= 25.0)
+        return 25;
     return 30;
 }
 
-function clean_search_term($term) {
-    if (!$term) return '';
+function clean_search_term($term)
+{
+    if (!$term)
+        return '';
     $term = preg_replace('/\s*\([^)]*\)\s*/', ' ', $term);
     $term = trim(strtolower($term));
     $aliases = [
@@ -86,7 +104,8 @@ function clean_search_term($term) {
         'howrah station' => 'howrah',
         'sealdah station' => 'sealdah',
         'sealdah stn' => 'sealdah',
-        'airport' => 'nsch airport'
+        'airport' => 'airport',
+        'nscbi airport' => 'airport'
     ];
     return $aliases[$term] ?? $term;
 }
@@ -107,7 +126,7 @@ if ($route === 'search' || $route === 'routes') {
     $from = trim($_GET['from'] ?? '');
     $to = trim($_GET['to'] ?? '');
     $bus_no = trim($_GET['bus_no'] ?? ($_GET['q'] ?? ''));
-    $limit = min((int)($_GET['limit'] ?? 80), 100);
+    $limit = min((int) ($_GET['limit'] ?? 80), 100);
 
     // Direct search by Bus Number
     if ($bus_no || ($from && !$to)) {
@@ -186,7 +205,8 @@ if ($route === 'search' || $route === 'routes') {
 
         foreach ($hubs as $hub) {
             $hub_clean = clean_search_term($hub);
-            if ($hub_clean === $from_clean || $hub_clean === $to_clean) continue;
+            if ($hub_clean === $from_clean || $hub_clean === $to_clean)
+                continue;
 
             // Leg 1
             $s1 = $db->prepare("
@@ -286,7 +306,7 @@ if ($route === 'stops/search' || $route === 'stops') {
 // -------------------------------------------------------------
 if (preg_match('#^routes/(\d+)$#', $route, $m)) {
     $db = get_db();
-    $route_id = (int)$m[1];
+    $route_id = (int) $m[1];
     $stmt = $db->prepare("SELECT * FROM routes WHERE id = ?");
     $stmt->bind_param('i', $route_id);
     $stmt->execute();
@@ -361,13 +381,13 @@ if ($route === 'metro/plan') {
     }
 
     $same_line = ($stn1['line_id'] === $stn2['line_id']);
-    $dist = abs((float)$stn1['distance_km'] - (float)$stn2['distance_km']);
+    $dist = abs((float) $stn1['distance_km'] - (float) $stn2['distance_km']);
     $fare = calculate_metro_fare($dist);
-    $stations_count = abs((int)$stn1['station_order'] - (int)$stn2['station_order']) + 1;
+    $stations_count = abs((int) $stn1['station_order'] - (int) $stn2['station_order']) + 1;
 
     // Fetch intermediate stations
-    $low = min((int)$stn1['station_order'], (int)$stn2['station_order']);
-    $high = max((int)$stn1['station_order'], (int)$stn2['station_order']);
+    $low = min((int) $stn1['station_order'], (int) $stn2['station_order']);
+    $high = max((int) $stn1['station_order'], (int) $stn2['station_order']);
     $inter_stmt = $db->prepare("
         SELECT s.station_name, s.station_bengali, s.line_id, l.line_name, l.line_color, s.distance_km, s.interchange_info 
         FROM metro_stations s 
@@ -380,10 +400,10 @@ if ($route === 'metro/plan') {
     $inter_res = $inter_stmt->get_result();
     $path = [];
     while ($p = $inter_res->fetch_assoc()) {
-        $p['distance_km'] = (float)$p['distance_km'];
+        $p['distance_km'] = (float) $p['distance_km'];
         $path[] = $p;
     }
-    if ((int)$stn1['station_order'] > (int)$stn2['station_order']) {
+    if ((int) $stn1['station_order'] > (int) $stn2['station_order']) {
         $path = array_reverse($path);
     }
 
@@ -391,11 +411,11 @@ if ($route === 'metro/plan') {
         'type' => $same_line ? 'DIRECT' : 'INTERCHANGE',
         'from_station' => $from,
         'to_station' => $to,
-        'fare' => (int)$fare,
+        'fare' => (int) $fare,
         'fare_text' => "₹$fare",
-        'stations_count' => (int)$stations_count,
-        'distance_km' => round((float)$dist, 2),
-        'duration_mins' => round((float)$stations_count * 2.2),
+        'stations_count' => (int) $stations_count,
+        'distance_km' => round((float) $dist, 2),
+        'duration_mins' => round((float) $stations_count * 2.2),
         'line_name' => $stn1['line_name'] ?? 'Metro Corridor',
         'line_color' => $stn1['line_color'] ?? '#00897B',
         'stations' => $path
@@ -417,15 +437,16 @@ if ($route === 'bus/ping' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $raw = file_get_contents('php://input');
     $data = json_decode($raw, true) ?? [];
     $route_no = strtoupper(str_replace([' ', '-'], '', $data['route_no'] ?? ''));
-    $lat = (float)($data['lat'] ?? 0);
-    $lng = (float)($data['lng'] ?? 0);
-    $speed = (float)($data['speed_kmh'] ?? 20.0);
+    $lat = (float) ($data['lat'] ?? 0);
+    $lng = (float) ($data['lng'] ?? 0);
+    $speed = (float) ($data['speed_kmh'] ?? 20.0);
 
     // Silent anti-spoof filter (Kolkata bounding box)
     if ($lat >= 22.2 && $lat <= 22.9 && $lng >= 88.1 && $lng <= 88.7 && $speed <= 85.0 && $route_no) {
         $store = file_exists($cache_file) ? json_decode(file_get_contents($cache_file), true) : [];
-        if (!is_array($store)) $store = [];
-        
+        if (!is_array($store))
+            $store = [];
+
         $now = time();
         $buses = $store[$route_no] ?? [];
         // Prune older than 75 seconds
@@ -473,7 +494,8 @@ if ($route === 'bus/live/stats') {
     foreach ($store as $k => $list) {
         $valid_cnt = 0;
         foreach ($list as $b) {
-            if ($now - $b['last_updated'] < 75) $valid_cnt++;
+            if ($now - $b['last_updated'] < 75)
+                $valid_cnt++;
         }
         if ($valid_cnt > 0) {
             $total += $valid_cnt;
@@ -491,7 +513,8 @@ if ($route === 'chat/list' || $route === 'chat/messages') {
     $db = get_db();
     $channel = trim($_GET['channel'] ?? 'general');
     $limit = min(intval($_GET['limit'] ?? 40), 100);
-    if ($limit <= 0) $limit = 40;
+    if ($limit <= 0)
+        $limit = 40;
 
     if ($channel === 'general' || empty($channel)) {
         $stmt = $db->prepare("SELECT id, channel, user_name, route_ref, status_tag, message, DATE_FORMAT(created_at, '%h:%i %p') as time_str, created_at FROM community_chat WHERE channel = 'general' ORDER BY id DESC LIMIT ?");
@@ -572,7 +595,8 @@ if ($route === 'admin/route/add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $raw = file_get_contents('php://input');
     $data = json_decode($raw, true) ?? $_POST;
     $pass = $data['api_key'] ?? $data['passcode'] ?? '';
-    if (preg_match('/Bearer\s+(.*)$/i', $auth, $m)) $pass = $m[1];
+    if (preg_match('/Bearer\s+(.*)$/i', $auth, $m))
+        $pass = $m[1];
 
     if ($pass !== 'cholo2026admin' && $pass !== 'cholo2026') {
         echo json_encode(['success' => false, 'error' => 'Unauthorized admin access']);
@@ -598,8 +622,10 @@ if ($route === 'admin/route/add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $stops = preg_split('/[,\r\n]+/', $stops);
     }
     $stops = array_values(array_filter(array_map('trim', $stops)));
-    if (empty($stops) || $stops[0] !== $orig) array_unshift($stops, $orig);
-    if (end($stops) !== $dest) $stops[] = $dest;
+    if (empty($stops) || $stops[0] !== $orig)
+        array_unshift($stops, $orig);
+    if (end($stops) !== $dest)
+        $stops[] = $dest;
 
     $r_name = "$orig ➔ $dest";
     $tot = count($stops);

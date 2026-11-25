@@ -42,42 +42,40 @@ class _ResultsScreenState extends State<ResultsScreen> {
   }
 
   void _performSearch() async {
-    // 1. Instant 0ms In-Memory Preload
-    final localDirect = BusDataService().searchRoutes(_currentFrom, _currentTo);
-    if (localDirect.isNotEmpty) {
-      setState(() {
-        _directRoutes = localDirect;
-        _isLoading = false;
-        _error = '';
-      });
-    } else {
-      setState(() {
-        _isLoading = true;
-        _error = '';
-      });
-    }
+    // 1. Instant 0ms 100% Offline Search (all 2,172 routes + 1-transfer hub engine)
+    final busData = BusDataService();
+    final List<BusRoute> localDirect = _isBusNoSearch
+        ? busData.searchBusNumbers(_currentFrom, uniqueByRouteNo: false, limit: 80)
+        : busData.searchRoutes(_currentFrom, _currentTo, limit: 80);
 
-    // 2. Silent Network Sync
+    final List<TransferRoute> localTransfers = (!_isBusNoSearch && localDirect.length < 4)
+        ? busData.searchTransfers(_currentFrom, _currentTo)
+        : [];
+
+    setState(() {
+      _directRoutes = localDirect;
+      _transferRoutes = localTransfers;
+      _isLoading = false;
+      _error = '';
+    });
+
+    // 2. Optional silent background sync (never blocks UI or shows offline errors)
     try {
       final res = await _api.searchRoutes(_currentFrom, _currentTo);
       final netDirect = res['direct'] as List<BusRoute>;
       final netTransfers = res['transfers'] as List<TransferRoute>;
-      if (mounted) {
+      if (mounted && (netDirect.isNotEmpty || netTransfers.isNotEmpty)) {
         setState(() {
-          if (netDirect.isNotEmpty || _directRoutes.isEmpty) {
+          if (netDirect.length > _directRoutes.length) {
             _directRoutes = netDirect;
           }
-          _transferRoutes = netTransfers;
-          _isLoading = false;
+          if (_transferRoutes.isEmpty && netTransfers.isNotEmpty) {
+            _transferRoutes = netTransfers;
+          }
         });
       }
-    } catch (e) {
-      if (mounted && _directRoutes.isEmpty) {
-        setState(() {
-          _error = 'Could not load buses. Please verify your connection.';
-          _isLoading = false;
-        });
-      }
+    } catch (_) {
+      // Offline dataset already resolved the search cleanly.
     }
   }
 
