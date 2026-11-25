@@ -537,15 +537,99 @@ if ($route === 'chat/post' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // -------------------------------------------------------------
-// 8. BACKGROUND OTA UPDATE CHECK
+// 8. BACKGROUND OTA UPDATE CHECK & SYNC
 // -------------------------------------------------------------
-if ($route === 'ota/check') {
+if ($route === 'ota/check' || $route === 'sync') {
+    $client_v = $_GET['version'] ?? '2.4.0';
+    $vfile = __DIR__ . '/ota_version.json';
+    $v = '2.4.0';
+    $has_update = false;
+    $changelog = 'Kolkata bus route database synced via OTA.';
+    if (file_exists($vfile)) {
+        $vdata = json_decode(file_get_contents($vfile), true);
+        if (!empty($vdata['version'])) {
+            $v = $vdata['version'];
+            if ($client_v !== $v) {
+                $has_update = true;
+                $changelog = $vdata['changelog'] ?? $changelog;
+            }
+        }
+    }
     echo json_encode(secure_encrypt([
         'success' => true,
-        'current_version' => '2.4.0',
-        'has_updates' => false,
-        'message' => 'Your route database is up to date.'
+        'version' => $v,
+        'has_updates' => $has_update,
+        'changelog' => $changelog
     ]));
+    exit;
+}
+
+// -------------------------------------------------------------
+// 9. ADMIN API: ADD ROUTE VIA REST API
+// -------------------------------------------------------------
+if ($route === 'admin/route/add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+    $raw = file_get_contents('php://input');
+    $data = json_decode($raw, true) ?? $_POST;
+    $pass = $data['api_key'] ?? $data['passcode'] ?? '';
+    if (preg_match('/Bearer\s+(.*)$/i', $auth, $m)) $pass = $m[1];
+
+    if ($pass !== 'cholo2026admin' && $pass !== 'cholo2026') {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized admin access']);
+        exit;
+    }
+
+    $db = get_db();
+    $r_no = trim($data['route_no'] ?? '');
+    $orig = trim($data['origin'] ?? '');
+    $dest = trim($data['destination'] ?? '');
+    $b_type = trim($data['bus_type'] ?? 'City Bus');
+    $cat = trim($data['category'] ?? 'West Bengal Transport Corporation');
+    $tt = trim($data['timetable'] ?? 'Runs daily 06:00 AM - 09:30 PM');
+    $img = trim($data['image_url'] ?? '');
+    $stops = $data['stops'] ?? [];
+
+    if (empty($r_no) || empty($orig) || empty($dest)) {
+        echo json_encode(['success' => false, 'error' => 'route_no, origin, destination are required']);
+        exit;
+    }
+
+    if (is_string($stops)) {
+        $stops = preg_split('/[,\r\n]+/', $stops);
+    }
+    $stops = array_values(array_filter(array_map('trim', $stops)));
+    if (empty($stops) || $stops[0] !== $orig) array_unshift($stops, $orig);
+    if (end($stops) !== $dest) $stops[] = $dest;
+
+    $r_name = "$orig ➔ $dest";
+    $tot = count($stops);
+
+    $stmt = $db->prepare("INSERT INTO routes (route_no, route_name, origin, destination, category, bus_type, timetable, image_url, total_stops) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("ssssssssi", $r_no, $r_name, $orig, $dest, $cat, $b_type, $tt, $img, $tot);
+    if (!$stmt->execute()) {
+        echo json_encode(['success' => false, 'error' => $db->error]);
+        exit;
+    }
+    $route_id = $stmt->insert_id;
+
+    $s_stmt = $db->prepare("INSERT INTO route_stops (route_id, stop_order, stop_name, stop_clean) VALUES (?, ?, ?, ?)");
+    $m_stmt = $db->prepare("INSERT INTO stops (stop_name, routes_count) VALUES (?, 1) ON DUPLICATE KEY UPDATE routes_count = routes_count + 1");
+
+    foreach ($stops as $idx => $sname) {
+        $order = $idx + 1;
+        $clean = strtolower($sname);
+        $s_stmt->bind_param("iiss", $route_id, $order, $sname, $clean);
+        $s_stmt->execute();
+        $m_stmt->bind_param("s", $sname);
+        $m_stmt->execute();
+    }
+
+    echo json_encode([
+        'success' => true,
+        'message' => "Route $r_no successfully created with $tot stops",
+        'route_id' => $route_id,
+        'total_stops' => $tot
+    ]);
     exit;
 }
 

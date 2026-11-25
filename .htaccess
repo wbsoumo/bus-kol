@@ -1,6 +1,10 @@
 RewriteEngine On
 RewriteBase /
 
+# Admin panel routing
+RewriteRule ^admin/?$ admin/index.php [QSA,L]
+RewriteRule ^admin/(.*)$ admin/$1 [QSA,L]
+
 # Route all /api/* requests to high-performance native PHP router
 RewriteRule ^api/(.*)$ api.php?endpoint=$1 [QSA,L]
 
