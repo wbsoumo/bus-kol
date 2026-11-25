@@ -12,6 +12,7 @@ DirectoryIndex index.php index.html static/index.html
     RewriteRule ^deploy\.php$ - [L]
     RewriteRule ^import-db$ - [L]
     RewriteRule ^CholoKolkata-release\.apk$ - [L]
+    RewriteRule ^download/apk/?$ CholoKolkata-release.apk [L]
 
     # Route all Transit API calls to api.php
     RewriteRule ^api/(.*)$ api.php?endpoint=$1 [QSA,L]
