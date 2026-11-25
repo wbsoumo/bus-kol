@@ -20,15 +20,8 @@ class ApiService {
 
   // Automatic Host Resolver for Emulator vs Production Device
   String get baseUrl {
-    if (kReleaseMode) {
-      return productionDomain;
-    }
-    if (kIsWeb) return 'http://localhost:5001';
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      // 10.0.2.2 maps to host localhost in Android Emulator
-      return 'http://10.0.2.2:5001';
-    }
-    return 'http://localhost:5001';
+    // Connect directly to live production cPanel API
+    return productionDomain;
   }
 
   /// Secure Decryption of AES-GCM 256 Payload (Zero Data Leak)
@@ -196,10 +189,15 @@ class ApiService {
 
   /// 7. Community Chat Feed (m-Indicator style)
   Future<List<ChatMessage>> getChatMessages(String channel) async {
-    final endpoint = '/api/chat/messages?channel=${Uri.encodeComponent(channel)}&limit=30';
-    final data = await _secureGet(endpoint);
-    final msgs = data['messages'] as List? ?? [];
-    return msgs.map((m) => ChatMessage.fromJson(m)).toList();
+    final endpoint = '/api/chat/messages?channel=${Uri.encodeComponent(channel)}&limit=50';
+    try {
+      final data = await _secureGet(endpoint);
+      final msgs = data['messages'] as List? ?? [];
+      return msgs.map((m) => ChatMessage.fromJson(m)).toList();
+    } catch (e) {
+      debugPrint('Error getting chat messages: $e');
+      return [];
+    }
   }
 
   /// 8. Post Community Chat Alert
@@ -210,20 +208,25 @@ class ApiService {
     required String statusTag,
     required String message,
   }) async {
-    final uri = Uri.parse('$baseUrl/api/chat/post');
-    final response = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'channel': channel,
-        'user_name': userName,
-        'route_ref': routeRef,
-        'status_tag': statusTag,
-        'message': message,
-      }),
-    ).timeout(const Duration(seconds: 10));
+    try {
+      final uri = Uri.parse('$baseUrl/api/chat/post');
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'channel': channel,
+          'user_name': userName,
+          'route_ref': routeRef,
+          'status_tag': statusTag,
+          'message': message,
+        }),
+      ).timeout(const Duration(seconds: 10));
 
-    return response.statusCode == 200;
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error posting chat message: $e');
+      return false;
+    }
   }
 
   /// 9. OTA Dynamic Background Route Sync (No APK updates required)

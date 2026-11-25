@@ -310,7 +310,7 @@ class ChatMessage {
       routeRef: json['route_ref'] ?? '',
       statusTag: json['status_tag'] ?? 'Normal',
       message: json['message'] ?? '',
-      timeStr: json['time_str'] ?? '',
+      timeStr: json['time_str'] ?? json['created_at'] ?? 'Just now',
     );
   }
 }

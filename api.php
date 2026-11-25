@@ -517,8 +517,8 @@ if ($route === 'chat/post' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $channel = trim($data['channel'] ?? 'general');
     $user = trim($data['user_name'] ?? '');
     if (empty($user) || strtolower($user) === 'commuter' || strtolower($user) === 'passenger') {
-        $rand_num = rand(100, 999);
-        $user = "Passenger #$rand_num";
+        $rand_num = rand(10000, 99999);
+        $user = "Passenger_$rand_num";
     }
     $msg = trim($data['message'] ?? '');
     $route_ref = trim($data['route_ref'] ?? '');

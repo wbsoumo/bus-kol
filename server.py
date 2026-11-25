@@ -837,7 +837,7 @@ def post_chat_message():
         channel = req_data.get('channel', 'general').strip()
         user_name = req_data.get('user_name', '').strip()[:50]
         if not user_name or user_name.lower() in ('commuter', 'passenger'):
-            user_name = f"Passenger #{random.randint(100, 999)}"
+            user_name = f"Passenger_{random.randint(10000, 99999)}"
         route_ref = req_data.get('route_ref', '').strip()[:50]
         status_tag = req_data.get('status_tag', 'Normal').strip()[:50]
         message = req_data.get('message', '').strip()
