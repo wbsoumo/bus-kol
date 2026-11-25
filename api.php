@@ -248,11 +248,16 @@ if ($route === 'search' || $route === 'routes') {
 // -------------------------------------------------------------
 // 2. STOP AUTOCOMPLETE SEARCH
 // -------------------------------------------------------------
-if ($route === 'stops/search') {
+if ($route === 'stops/search' || $route === 'stops') {
     $db = get_db();
     $q = trim($_GET['q'] ?? '');
-    if (strlen($q) < 2) {
-        echo json_encode(secure_encrypt(['success' => true, 'stops' => []]));
+    if (strlen($q) === 0) {
+        $res = $db->query("SELECT stop_name, routes_count FROM stops ORDER BY routes_count DESC, LENGTH(stop_name) ASC LIMIT 15");
+        $stops = [];
+        while ($s = $res->fetch_assoc()) {
+            $stops[] = $s;
+        }
+        echo json_encode(secure_encrypt(['success' => true, 'stops' => $stops]));
         exit;
     }
     $clean = clean_search_term($q);
@@ -260,11 +265,12 @@ if ($route === 'stops/search') {
         SELECT stop_name, routes_count 
         FROM stops 
         WHERE stop_name LIKE ? 
-        ORDER BY routes_count DESC, LENGTH(stop_name) ASC 
-        LIMIT 15
+        ORDER BY (stop_name LIKE ?) DESC, routes_count DESC, LENGTH(stop_name) ASC 
+        LIMIT 20
     ");
+    $prefix = "$clean%";
     $term = "%$clean%";
-    $stmt->bind_param('s', $term);
+    $stmt->bind_param('ss', $term, $prefix);
     $stmt->execute();
     $res = $stmt->get_result();
     $stops = [];
