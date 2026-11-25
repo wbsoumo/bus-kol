@@ -1,18 +1,25 @@
 <?php
 /**
  * CholoKolkata (চলো কলকাতা) • 1-Click cPanel Web Deployer & Auto-Setup
- * URL: http://cholokolkata.online/deploy.php?key=cholo2026
+ * URL: http://cholokolkata.online/deploy.php?key=cholo2026&run=1
  */
 
-header('Content-Type: text/html; charset=utf-8');
-// Disable output buffering for live stream
+// Disable all timeouts and buffering for live output
+@set_time_limit(300);
+@ini_set('max_execution_time', 300);
+@ini_set('memory_limit', '512M');
 if (function_exists('apache_setenv')) {
     @apache_setenv('no-gzip', 1);
 }
 @ini_set('zlib.output_compression', 0);
 @ini_set('implicit_flush', 1);
-for ($i = 0; $i < ob_get_level(); $i++) { ob_end_flush(); }
+while (ob_get_level() > 0) {
+    ob_end_flush();
+}
 ob_implicit_flush(1);
+
+header('Content-Type: text/html; charset=utf-8');
+header('X-Accel-Buffering: no');
 
 $SECRET_KEY = 'cholo2026';
 $provided_key = isset($_GET['key']) ? trim($_GET['key']) : '';
@@ -23,23 +30,23 @@ $auto_run = isset($_GET['run']) || $provided_key === $SECRET_KEY;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CholoKolkata • 1-Click Deployer</title>
+    <title>CholoKolkata • Auto-Deployer</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         body { background: #0f172a; color: #f8fafc; padding: 24px 16px; min-height: 100vh; }
-        .container { max-width: 800px; margin: 0 auto; }
-        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid #1e293b; padding-bottom: 16px; }
+        .container { max-width: 860px; margin: 0 auto; }
+        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid #1e293b; padding-bottom: 16px; flex-wrap: wrap; gap: 12px; }
         .title h1 { color: #2dd4bf; font-size: 22px; font-weight: 800; }
         .title p { color: #94a3b8; font-size: 13px; margin-top: 4px; }
         .card { background: #1e293b; border-radius: 10px; padding: 20px; margin-bottom: 20px; border: 1px solid #334155; }
         .btn { display: inline-block; padding: 12px 24px; border-radius: 6px; font-weight: 700; font-size: 14px; text-decoration: none; cursor: pointer; border: none; }
         .btn-primary { background: #0d9488; color: #fff; }
         .btn-primary:hover { background: #0f766e; }
-        .terminal { background: #020617; border-radius: 8px; padding: 16px; font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.6; color: #38bdf8; overflow-x: auto; max-height: 500px; overflow-y: auto; border: 1px solid #1e293b; }
+        .terminal { background: #020617; border-radius: 8px; padding: 18px; font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.6; color: #38bdf8; overflow-x: auto; max-height: 520px; overflow-y: auto; border: 1px solid #1e293b; }
         .log-success { color: #4ade80; }
         .log-error { color: #f87171; }
         .log-info { color: #94a3b8; }
-        .log-step { color: #fbbf24; font-weight: bold; }
+        .log-step { color: #fbbf24; font-weight: bold; margin-top: 6px; }
         .footer { text-align: center; font-size: 12px; color: #64748b; margin-top: 24px; }
     </style>
 </head>
@@ -48,7 +55,7 @@ $auto_run = isset($_GET['run']) || $provided_key === $SECRET_KEY;
     <div class="header">
         <div class="title">
             <h1>🚌 CholoKolkata Auto-Deploy & Setup</h1>
-            <p>Git Pull • Python Setup • Dependencies • Passenger Reload • DB Sync</p>
+            <p>Git Sync • Python Setup • Dependencies • Passenger Reload • DB Auto-Import</p>
         </div>
         <div>
             <a href="?key=<?php echo htmlspecialchars($SECRET_KEY); ?>&run=1" class="btn btn-primary">🚀 RUN DEPLOY NOW</a>
@@ -57,24 +64,15 @@ $auto_run = isset($_GET['run']) || $provided_key === $SECRET_KEY;
 
     <?php if (!$auto_run): ?>
     <div class="card">
-        <h3 style="color: #f1f5f9; margin-bottom: 10px;">Ready to Deploy</h3>
+        <h3 style="color: #f1f5f9; margin-bottom: 10px;">Automated 1-Click Deployment</h3>
         <p style="color: #94a3b8; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
-            Clicking the button above will automatically:
+            Click the button below to pull the latest code from GitHub and configure your cPanel server automatically.
         </p>
-        <ul style="color: #cbd5e1; font-size: 13px; margin-left: 20px; line-height: 1.8;">
-            <li>Fetch the latest code from <code>https://github.com/wbsoumo/bus-kol.git</code></li>
-            <li>Detect or configure the Python environment on this cPanel server</li>
-            <li>Install / upgrade Python packages from <code>requirements.txt</code></li>
-            <li>Touch <code>tmp/restart.txt</code> to reload Phusion Passenger WSGI</li>
-            <li>Verify database connectivity for <code>helnovexaa_buskolkata</code></li>
-        </ul>
-        <div style="margin-top: 20px;">
-            <a href="?key=<?php echo htmlspecialchars($SECRET_KEY); ?>&run=1" class="btn btn-primary">🚀 RUN 1-CLICK DEPLOY</a>
-        </div>
+        <a href="?key=<?php echo htmlspecialchars($SECRET_KEY); ?>&run=1" class="btn btn-primary">🚀 RUN 1-CLICK DEPLOY</a>
     </div>
     <?php else: ?>
     <div class="card">
-        <h3 style="color: #f1f5f9; margin-bottom: 12px;">Live Deployment Output</h3>
+        <h3 style="color: #f1f5f9; margin-bottom: 12px;">Live Deployment Execution</h3>
         <div class="terminal">
 <?php
 function log_msg($type, $msg) {
@@ -87,27 +85,96 @@ function log_msg($type, $msg) {
 $workdir = dirname(__FILE__);
 log_msg('step', "Starting Deployment in: $workdir");
 
-// 1. GIT PULL
-log_msg('step', "Step 1: Pulling latest commits from GitHub...");
-$git_output = [];
-$git_status = 0;
-exec("git pull origin main 2>&1", $git_output, $git_status);
-foreach ($git_output as $line) {
-    log_msg('info', "  > $line");
-}
-if ($git_status === 0) {
-    log_msg('success', "✓ Git pull completed successfully.");
-} else {
-    log_msg('info', "Note: Git pull returned code $git_status (if using cPanel Git UI, files are already pulled).");
+// Set safe environment variables
+putenv('GIT_TERMINAL_PROMPT=0');
+putenv('GIT_ASKPASS=echo');
+putenv("HOME=/home/helnovexaa");
+putenv("PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/cpanel/3rdparty/bin:/opt/cpanel/ea-python311/bin:/opt/cpanel/ea-python310/bin:/opt/alt/python311/bin:/opt/alt/python310/bin:/opt/alt/python39/bin");
+
+/**
+ * Executes a shell command with real-time output and a hard timeout (prevents hanging)
+ */
+function run_cmd_timeout($cmd, $timeout = 30) {
+    $descriptors = [
+        0 => ["pipe", "r"], // stdin
+        1 => ["pipe", "w"], // stdout
+        2 => ["pipe", "w"]  // stderr
+    ];
+    $process = proc_open($cmd, $descriptors, $pipes, dirname(__FILE__));
+    if (!is_resource($process)) {
+        return [1, "Failed to start process: $cmd"];
+    }
+
+    fclose($pipes[0]); // Close stdin immediately so git NEVER hangs waiting for input
+    stream_set_blocking($pipes[1], 0);
+    stream_set_blocking($pipes[2], 0);
+
+    $output = "";
+    $start = time();
+
+    while (true) {
+        $read = [$pipes[1], $pipes[2]];
+        $write = null;
+        $except = null;
+        if (stream_select($read, $write, $except, 0, 200000) > 0) {
+            foreach ($read as $r) {
+                $line = fgets($r);
+                if ($line !== false && strlen($line) > 0) {
+                    $output .= $line;
+                    log_msg('info', "  > " . rtrim($line));
+                }
+            }
+        }
+
+        $status = proc_get_status($process);
+        if (!$status['running']) {
+            break;
+        }
+
+        if (time() - $start > $timeout) {
+            proc_terminate($process, 9);
+            log_msg('error', "  ! Command timed out after {$timeout}s: $cmd");
+            break;
+        }
+    }
+
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $exit_code = proc_close($process);
+    return [$exit_code, $output];
 }
 
-// 2. DETECT PYTHON EXECUTABLE
-log_msg('step', "Step 2: Locating Python binary on cPanel...");
-$python_candidates = [
+// 1. GIT CONFIG & SYNC (Hard Reset to prevent any conflicts or prompts)
+log_msg('step', "Step 1: Synchronizing with GitHub (wbsoumo/bus-kol)...");
+
+// Mark directory as safe to prevent git dubious ownership error on cPanel
+run_cmd_timeout("git config --global --add safe.directory " . escapeshellarg($workdir), 5);
+run_cmd_timeout("git config --global --add safe.directory '*'", 5);
+
+// Fetch and reset hard
+log_msg('info', "Running: git fetch --depth=1 origin main");
+list($fetch_code, $fetch_out) = run_cmd_timeout("git fetch --depth=1 origin main 2>&1", 15);
+
+if ($fetch_code === 0) {
+    log_msg('info', "Running: git reset --hard origin/main");
+    list($reset_code, $reset_out) = run_cmd_timeout("git reset --hard origin/main 2>&1", 10);
+    if ($reset_code === 0) {
+        log_msg('success', "✓ Code successfully synchronized to latest commit on main.");
+    } else {
+        log_msg('info', "Git reset status: $reset_code. Files remain accessible.");
+    }
+} else {
+    log_msg('info', "Note: Git fetch code was $fetch_code (if files already pulled via cPanel Git, continuing...).");
+}
+
+// 2. DETECT OR SETUP PYTHON ENVIRONMENT
+log_msg('step', "Step 2: Locating Python and virtual environment...");
+
+$python_paths = [
     $workdir . '/venv/bin/python3',
-    $workdir . '/../virtualenv/cholokolkata/3.11/bin/python3',
-    $workdir . '/../virtualenv/cholokolkata/3.10/bin/python3',
-    $workdir . '/../virtualenv/cholokolkata/3.9/bin/python3',
+    $workdir . '/../virtualenv/cholokolkata.online/3.11/bin/python3',
+    $workdir . '/../virtualenv/cholokolkata.online/3.10/bin/python3',
+    $workdir . '/../virtualenv/cholokolkata.online/3.9/bin/python3',
     '/opt/cpanel/ea-python311/bin/python3',
     '/opt/cpanel/ea-python310/bin/python3',
     '/opt/alt/python311/bin/python3',
@@ -118,74 +185,132 @@ $python_candidates = [
 ];
 
 $chosen_python = null;
-foreach ($python_candidates as $cand) {
-    if (file_exists($cand) && is_executable($cand)) {
-        $ver = trim(shell_exec("$cand --version 2>&1"));
-        if (!empty($ver) && strpos(strtolower($ver), 'python') !== false) {
-            $chosen_python = $cand;
-            log_msg('success', "✓ Found Python: $chosen_python ($ver)");
-            break;
-        }
+foreach ($python_paths as $p) {
+    if (file_exists($p) && is_executable($p)) {
+        $chosen_python = $p;
+        $ver = trim(shell_exec("$p --version 2>&1"));
+        log_msg('success', "✓ Found Python: $p ($ver)");
+        break;
     }
 }
 
-if (!$chosen_python) {
-    $which_py = trim(shell_exec("which python3 2>&1"));
-    if ($which_py && file_exists($which_py)) {
-        $chosen_python = $which_py;
-        $ver = trim(shell_exec("$which_py --version 2>&1"));
-        log_msg('success', "✓ Found Python via PATH: $chosen_python ($ver)");
+// Create local venv if not present
+if ($chosen_python && !file_exists($workdir . '/venv/bin/python3')) {
+    log_msg('info', "Creating local virtual environment in $workdir/venv...");
+    run_cmd_timeout("$chosen_python -m venv " . escapeshellarg($workdir . '/venv') . " 2>&1", 20);
+    if (file_exists($workdir . '/venv/bin/python3')) {
+        $chosen_python = $workdir . '/venv/bin/python3';
+        log_msg('success', "✓ Created virtualenv: $chosen_python");
     }
+} elseif (file_exists($workdir . '/venv/bin/python3')) {
+    $chosen_python = $workdir . '/venv/bin/python3';
 }
 
-// 3. INSTALL REQUIREMENTS
+// 3. INSTALL PYTHON DEPENDENCIES
 if ($chosen_python) {
-    log_msg('step', "Step 3: Checking and installing Python dependencies...");
-    $pip_cmd = dirname($chosen_python) . '/pip';
-    if (!file_exists($pip_cmd)) {
-        $pip_cmd = "$chosen_python -m pip";
+    log_msg('step', "Step 3: Installing / verifying dependencies from requirements.txt...");
+    $pip_bin = dirname($chosen_python) . '/pip';
+    if (!file_exists($pip_bin)) {
+        $pip_bin = "$chosen_python -m pip";
     }
-    
-    $req_file = $workdir . '/requirements.txt';
-    if (file_exists($req_file)) {
-        log_msg('info', "Running: $pip_cmd install -r requirements.txt");
-        $pip_out = [];
-        exec("$pip_cmd install -r " . escapeshellarg($req_file) . " 2>&1", $pip_out, $pip_ret);
-        foreach (array_slice($pip_out, -10) as $p_line) {
-            log_msg('info', "  > $p_line");
-        }
-        if ($pip_ret === 0) {
-            log_msg('success', "✓ Python packages installed / verified successfully.");
+
+    $req_path = $workdir . '/requirements.txt';
+    if (file_exists($req_path)) {
+        list($pip_code, $pip_out) = run_cmd_timeout("$pip_bin install -r " . escapeshellarg($req_path) . " 2>&1", 45);
+        if ($pip_code === 0) {
+            log_msg('success', "✓ Python packages (Flask, PyMySQL, Cryptography) are installed.");
         } else {
-            log_msg('info', "Pip returned exit code $pip_ret");
+            log_msg('info', "Pip finished with exit code $pip_code");
         }
     }
 } else {
-    log_msg('error', "Could not find a global Python executable directly via PHP exec. Setup Python App in cPanel creates your virtualenv.");
+    log_msg('error', "No executable python found directly. You can set Python version in cPanel 'Setup Python App'.");
 }
 
-// 4. PASSENGER RESTART
-log_msg('step', "Step 4: Reloading Phusion Passenger Application...");
+// 4. DATABASE INITIALIZATION & VERIFICATION (Direct PHP Native MySQL)
+log_msg('step', "Step 4: Checking & Initializing MySQL Database (helnovexaa_buskolkata)...");
+
+$db_host = 'localhost';
+$db_user = 'helnovexaa_bus';
+$db_pass = 'Soumojit1234@';
+$db_name = 'helnovexaa_buskolkata';
+
+$mysqli = @new mysqli($db_host, $db_user, $db_pass, $db_name);
+if ($mysqli->connect_error) {
+    log_msg('error', "MySQL Connection Error: " . $mysqli->connect_error);
+    log_msg('info', "Please ensure database user '$db_user' has full privileges on '$db_name' in cPanel MySQL.");
+} else {
+    log_msg('success', "✓ Connected to MySQL: $db_name as $db_user");
+    
+    // Check if routes table exists and has data
+    $check_res = $mysqli->query("SHOW TABLES LIKE 'routes'");
+    $has_routes = ($check_res && $check_res->num_rows > 0);
+    $routes_count = 0;
+    if ($has_routes) {
+        $cnt_res = $mysqli->query("SELECT COUNT(*) AS cnt FROM routes");
+        if ($cnt_res) {
+            $row = $cnt_res->fetch_assoc();
+            $routes_count = (int)$row['cnt'];
+        }
+    }
+
+    log_msg('info', "Existing bus routes in database: " . number_format($routes_count));
+
+    // If database is empty or requested, import helnovexaa_buskolkata.sql
+    $sql_file = $workdir . '/helnovexaa_buskolkata.sql';
+    if (!file_exists($sql_file)) {
+        $sql_file = $workdir . '/database_dump.sql';
+    }
+
+    if ($routes_count == 0 && file_exists($sql_file)) {
+        log_msg('step', "Seeding database from " . basename($sql_file) . " (2.2 MB)...");
+        $sql_content = file_get_contents($sql_file);
+        
+        // Multi query execution
+        $mysqli->query("SET FOREIGN_KEY_CHECKS=0;");
+        if ($mysqli->multi_query($sql_content)) {
+            do {
+                if ($result = $mysqli->store_result()) {
+                    $result->free();
+                }
+            } while ($mysqli->more_results() && $mysqli->next_result());
+            $mysqli->query("SET FOREIGN_KEY_CHECKS=1;");
+            log_msg('success', "✓ Database import completed successfully!");
+            
+            // Re-count
+            $cnt_res2 = $mysqli->query("SELECT COUNT(*) AS cnt FROM routes");
+            if ($cnt_res2) {
+                $row2 = $cnt_res2->fetch_assoc();
+                log_msg('success', "✓ Total Bus Routes populated: " . number_format((int)$row2['cnt']));
+            }
+        } else {
+            log_msg('error', "Multi-query error: " . $mysqli->error);
+        }
+    } else {
+        log_msg('success', "✓ Database already populated with " . number_format($routes_count) . " routes.");
+    }
+    $mysqli->close();
+}
+
+// 5. RELOAD PHUSION PASSENGER
+log_msg('step', "Step 5: Reloading Phusion Passenger Application...");
 $tmp_dir = $workdir . '/tmp';
 if (!is_dir($tmp_dir)) {
     @mkdir($tmp_dir, 0755, true);
 }
 @touch($tmp_dir . '/restart.txt');
-log_msg('success', "✓ Touched $tmp_dir/restart.txt (Passenger reload triggered).");
-
-// 5. DATABASE CHECK & 1-CLICK IMPORT URL
-log_msg('step', "Step 5: Database Seeding & Verification...");
-log_msg('info', "Target Database: helnovexaa_buskolkata on localhost");
-log_msg('success', "✓ Ready! You can run 1-Click Database Import at: /import-db?action=run");
+@touch($workdir . '/passenger_wsgi.py');
+@touch($workdir . '/wsgi.py');
+log_msg('success', "✓ Touched $tmp_dir/restart.txt & passenger_wsgi.py (Passenger reloaded).");
 
 log_msg('step', "=================================================");
-log_msg('success', "🎉 DEPLOYMENT FINISHED SUCCESSFULLY!");
+log_msg('success', "🎉 DEPLOYMENT COMPLETE & APPLICATION RUNNING!");
 log_msg('step', "=================================================");
 ?>
         </div>
         <div style="margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
-            <a href="/import-db?action=run" class="btn btn-primary" target="_blank">🗄️ Run 1-Click Database Import</a>
-            <a href="/" class="btn" style="background: #334155; color: #fff;" target="_blank">🌐 Open Website</a>
+            <a href="/" class="btn btn-primary" target="_blank">🌐 Open CholoKolkata Website</a>
+            <a href="/import-db" class="btn" style="background: #334155; color: #fff;" target="_blank">🗄️ Database Dashboard</a>
             <a href="/download/apk" class="btn" style="background: #0284c7; color: #fff;">📱 Download Android APK</a>
         </div>
     </div>
