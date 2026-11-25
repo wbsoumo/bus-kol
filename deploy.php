@@ -4,7 +4,9 @@
  * URL: http://cholokolkata.online/deploy.php?key=cholo2026&run=1
  */
 
-// Disable all timeouts and buffering for live output
+// Enable full error display for debugging
+@error_reporting(E_ALL);
+@ini_set('display_errors', 1);
 @set_time_limit(300);
 @ini_set('max_execution_time', 300);
 @ini_set('memory_limit', '512M');
@@ -170,7 +172,7 @@ if ($fetch_code === 0) {
 // 2. DETECT OR SETUP PYTHON ENVIRONMENT
 log_msg('step', "Step 2: Locating Python and virtual environment...");
 
-$python_paths = [
+$python_candidates = [
     $workdir . '/venv/bin/python3',
     $workdir . '/../virtualenv/cholokolkata.online/3.11/bin/python3',
     $workdir . '/../virtualenv/cholokolkata.online/3.10/bin/python3',
@@ -181,50 +183,53 @@ $python_paths = [
     '/opt/alt/python310/bin/python3',
     '/opt/alt/python39/bin/python3',
     '/usr/bin/python3',
-    '/usr/local/bin/python3'
+    '/usr/local/bin/python3',
+    'python3'
 ];
 
 $chosen_python = null;
-foreach ($python_paths as $p) {
-    if (file_exists($p) && is_executable($p)) {
-        $chosen_python = $p;
-        $ver = trim(shell_exec("$p --version 2>&1"));
-        log_msg('success', "✓ Found Python: $p ($ver)");
+foreach ($python_candidates as $cand) {
+    list($code, $ver_out) = run_cmd_timeout("$cand --version 2>&1", 3);
+    if ($code === 0 && stripos($ver_out, 'python') !== false) {
+        $chosen_python = $cand;
+        $ver = trim($ver_out);
+        log_msg('success', "✓ Found Python: $cand ($ver)");
         break;
     }
 }
 
-// Create local venv if not present
-if ($chosen_python && !file_exists($workdir . '/venv/bin/python3')) {
-    log_msg('info', "Creating local virtual environment in $workdir/venv...");
-    run_cmd_timeout("$chosen_python -m venv " . escapeshellarg($workdir . '/venv') . " 2>&1", 20);
-    if (file_exists($workdir . '/venv/bin/python3')) {
-        $chosen_python = $workdir . '/venv/bin/python3';
-        log_msg('success', "✓ Created virtualenv: $chosen_python");
+if (!$chosen_python) {
+    log_msg('info', "Testing fallback 'python3' via PATH...");
+    list($py_code, $py_out) = run_cmd_timeout("python3 --version 2>&1", 3);
+    if ($py_code === 0) {
+        $chosen_python = "python3";
+        log_msg('success', "✓ Found Python via PATH: " . trim($py_out));
+    } else {
+        log_msg('info', "Python binary will be managed via cPanel 'Setup Python App'.");
     }
-} elseif (file_exists($workdir . '/venv/bin/python3')) {
-    $chosen_python = $workdir . '/venv/bin/python3';
 }
 
 // 3. INSTALL PYTHON DEPENDENCIES
 if ($chosen_python) {
-    log_msg('step', "Step 3: Installing / verifying dependencies from requirements.txt...");
-    $pip_bin = dirname($chosen_python) . '/pip';
-    if (!file_exists($pip_bin)) {
+    log_msg('step', "Step 3: Checking and installing Python dependencies...");
+    $pip_bin = (strpos($chosen_python, '/') !== false) ? dirname($chosen_python) . '/pip' : 'pip';
+    list($test_pip, $pip_ver) = run_cmd_timeout("$pip_bin --version 2>&1", 3);
+    if ($test_pip !== 0) {
         $pip_bin = "$chosen_python -m pip";
     }
 
     $req_path = $workdir . '/requirements.txt';
     if (file_exists($req_path)) {
+        log_msg('info', "Running: $pip_bin install -r requirements.txt (this may take ~15 seconds)...");
         list($pip_code, $pip_out) = run_cmd_timeout("$pip_bin install -r " . escapeshellarg($req_path) . " 2>&1", 45);
         if ($pip_code === 0) {
             log_msg('success', "✓ Python packages (Flask, PyMySQL, Cryptography) are installed.");
         } else {
-            log_msg('info', "Pip finished with exit code $pip_code");
+            log_msg('info', "Pip output: " . substr(trim($pip_out), -200));
         }
     }
 } else {
-    log_msg('error', "No executable python found directly. You can set Python version in cPanel 'Setup Python App'.");
+    log_msg('info', "Step 3: Skipping pip install (virtualenv is managed by cPanel).");
 }
 
 // 4. DATABASE INITIALIZATION & VERIFICATION (Direct PHP Native MySQL)
@@ -235,61 +240,65 @@ $db_user = 'helnovexaa_bus';
 $db_pass = 'Soumojit1234@';
 $db_name = 'helnovexaa_buskolkata';
 
-$mysqli = @new mysqli($db_host, $db_user, $db_pass, $db_name);
-if ($mysqli->connect_error) {
-    log_msg('error', "MySQL Connection Error: " . $mysqli->connect_error);
-    log_msg('info', "Please ensure database user '$db_user' has full privileges on '$db_name' in cPanel MySQL.");
-} else {
-    log_msg('success', "✓ Connected to MySQL: $db_name as $db_user");
-    
-    // Check if routes table exists and has data
-    $check_res = $mysqli->query("SHOW TABLES LIKE 'routes'");
-    $has_routes = ($check_res && $check_res->num_rows > 0);
-    $routes_count = 0;
-    if ($has_routes) {
-        $cnt_res = $mysqli->query("SELECT COUNT(*) AS cnt FROM routes");
-        if ($cnt_res) {
-            $row = $cnt_res->fetch_assoc();
-            $routes_count = (int)$row['cnt'];
-        }
-    }
-
-    log_msg('info', "Existing bus routes in database: " . number_format($routes_count));
-
-    // If database is empty or requested, import helnovexaa_buskolkata.sql
-    $sql_file = $workdir . '/helnovexaa_buskolkata.sql';
-    if (!file_exists($sql_file)) {
-        $sql_file = $workdir . '/database_dump.sql';
-    }
-
-    if ($routes_count == 0 && file_exists($sql_file)) {
-        log_msg('step', "Seeding database from " . basename($sql_file) . " (2.2 MB)...");
-        $sql_content = file_get_contents($sql_file);
+try {
+    $mysqli = @new mysqli($db_host, $db_user, $db_pass, $db_name);
+    if ($mysqli->connect_error) {
+        log_msg('error', "MySQL Connection Error: " . $mysqli->connect_error);
+        log_msg('info', "Please ensure database user '$db_user' has full privileges on '$db_name' in cPanel MySQL.");
+    } else {
+        log_msg('success', "✓ Connected to MySQL: $db_name as $db_user");
         
-        // Multi query execution
-        $mysqli->query("SET FOREIGN_KEY_CHECKS=0;");
-        if ($mysqli->multi_query($sql_content)) {
-            do {
-                if ($result = $mysqli->store_result()) {
-                    $result->free();
-                }
-            } while ($mysqli->more_results() && $mysqli->next_result());
-            $mysqli->query("SET FOREIGN_KEY_CHECKS=1;");
-            log_msg('success', "✓ Database import completed successfully!");
+        // Check if routes table exists and has data
+        $check_res = $mysqli->query("SHOW TABLES LIKE 'routes'");
+        $has_routes = ($check_res && $check_res->num_rows > 0);
+        $routes_count = 0;
+        if ($has_routes) {
+            $cnt_res = $mysqli->query("SELECT COUNT(*) AS cnt FROM routes");
+            if ($cnt_res) {
+                $row = $cnt_res->fetch_assoc();
+                $routes_count = (int)$row['cnt'];
+            }
+        }
+
+        log_msg('info', "Existing bus routes in database: " . number_format($routes_count));
+
+        // If database is empty, import helnovexaa_buskolkata.sql
+        $sql_file = $workdir . '/helnovexaa_buskolkata.sql';
+        if (!file_exists($sql_file)) {
+            $sql_file = $workdir . '/database_dump.sql';
+        }
+
+        if ($routes_count == 0 && file_exists($sql_file)) {
+            log_msg('step', "Seeding database from " . basename($sql_file) . " (2.2 MB)...");
+            $sql_content = file_get_contents($sql_file);
             
-            // Re-count
-            $cnt_res2 = $mysqli->query("SELECT COUNT(*) AS cnt FROM routes");
-            if ($cnt_res2) {
-                $row2 = $cnt_res2->fetch_assoc();
-                log_msg('success', "✓ Total Bus Routes populated: " . number_format((int)$row2['cnt']));
+            // Multi query execution
+            $mysqli->query("SET FOREIGN_KEY_CHECKS=0;");
+            if ($mysqli->multi_query($sql_content)) {
+                do {
+                    if ($result = $mysqli->store_result()) {
+                        $result->free();
+                    }
+                } while ($mysqli->more_results() && $mysqli->next_result());
+                $mysqli->query("SET FOREIGN_KEY_CHECKS=1;");
+                log_msg('success', "✓ Database import completed successfully!");
+                
+                // Re-count
+                $cnt_res2 = $mysqli->query("SELECT COUNT(*) AS cnt FROM routes");
+                if ($cnt_res2) {
+                    $row2 = $cnt_res2->fetch_assoc();
+                    log_msg('success', "✓ Total Bus Routes populated: " . number_format((int)$row2['cnt']));
+                }
+            } else {
+                log_msg('error', "Multi-query error: " . $mysqli->error);
             }
         } else {
-            log_msg('error', "Multi-query error: " . $mysqli->error);
+            log_msg('success', "✓ Database already populated with " . number_format($routes_count) . " routes.");
         }
-    } else {
-        log_msg('success', "✓ Database already populated with " . number_format($routes_count) . " routes.");
+        $mysqli->close();
     }
-    $mysqli->close();
+} catch (Throwable $db_err) {
+    log_msg('error', "MySQL Exception: " . $db_err->getMessage());
 }
 
 // 5. RELOAD PHUSION PASSENGER
