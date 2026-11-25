@@ -1,0 +1,29 @@
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/helnovexaa/cholokolkata.online"
+PassengerBaseURI "/"
+PassengerPython "/opt/alt/python311/bin/python3"
+PassengerAppType wsgi
+PassengerStartupFile passenger_wsgi.py
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+
+# Directory Index setup
+DirectoryIndex index.php index.html static/index.html
+
+# URL Rewriting for Static Files and Fallbacks
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Allow direct access to deploy script and installer
+    RewriteRule ^deploy\.php$ - [L]
+    RewriteRule ^import-db$ - [L]
+
+    # Serve static files directly from static directory
+    RewriteCond %{DOCUMENT_ROOT}/static/$1 -f
+    RewriteRule ^(.*)$ static/$1 [L]
+
+    # Route root requests to static/index.html if not handled by Passenger
+    RewriteCond %{REQUEST_URI} ^/$
+    RewriteCond %{DOCUMENT_ROOT}/static/index.html -f
+    RewriteRule ^$ static/index.html [L]
+</IfModule>
