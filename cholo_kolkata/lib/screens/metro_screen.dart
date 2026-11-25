@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../services/metro_service.dart';
 
 class MetroScreen extends StatefulWidget {
   const MetroScreen({super.key});
@@ -12,12 +13,13 @@ class MetroScreen extends StatefulWidget {
 class _MetroScreenState extends State<MetroScreen> {
   final ApiService _api = ApiService();
 
-  bool _isLoading = true;
-  List<MetroStation> _stations = [];
-  List<MetroLine> _lines = [];
+  // Instant 0ms In-Memory Preload
+  final bool _isLoading = false;
+  List<MetroStation> _stations = MetroService.defaultMetroStations;
+  List<MetroLine> _lines = MetroService.defaultMetroLines;
 
-  String? _fromStation;
-  String? _toStation;
+  String? _fromStation = 'Howrah Maidan';
+  String? _toStation = 'Esplanade';
 
   bool _isPlanning = false;
   MetroPlan? _plan;
@@ -27,29 +29,24 @@ class _MetroScreenState extends State<MetroScreen> {
   @override
   void initState() {
     super.initState();
-    _loadMetroData();
+    // 0ms instant plan for default corridor (Howrah Maidan -> Esplanade)
+    _plan = MetroService.planJourney('Howrah Maidan', 'Esplanade');
+    // Background sync (never blocks the UI)
+    _syncMetroData();
   }
 
-  void _loadMetroData() async {
+  void _syncMetroData() async {
     try {
       final stns = await _api.getMetroStations();
       final lines = await _api.getMetroLines();
-      setState(() {
-        _stations = stns;
-        _lines = lines;
-        _isLoading = false;
-
-        // Default popular route
-        if (_stations.isNotEmpty) {
-          _fromStation = 'Howrah Maidan';
-          _toStation = 'Esplanade';
-        }
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _alertMessage = 'Failed to load metro data';
-      });
+      if (mounted) {
+        setState(() {
+          _stations = stns;
+          _lines = lines;
+        });
+      }
+    } catch (_) {
+      // In-memory data is already loaded and active, no UI interruption needed
     }
   }
 
@@ -75,24 +72,24 @@ class _MetroScreenState extends State<MetroScreen> {
       return;
     }
 
+    // 1. Instant 0ms calculation directly from local MetroService
+    final localPlan = MetroService.planJourney(_fromStation!, _toStation!);
     setState(() {
-      _isPlanning = true;
+      _plan = localPlan;
+      _isPlanning = false;
       _alertMessage = '';
-      _areIntermediateExpanded = false; // reset to collapsed
+      _areIntermediateExpanded = false;
     });
 
+    // 2. Background sync with backend if online
     try {
       final p = await _api.planMetroRoute(_fromStation!, _toStation!);
-      setState(() {
-        _plan = p;
-        _isPlanning = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isPlanning = false;
-        _alertMessage = 'Could not calculate metro route';
-      });
-    }
+      if (mounted && p != null) {
+        setState(() {
+          _plan = p;
+        });
+      }
+    } catch (_) {}
   }
 
   Color _hexToColor(String hex) {

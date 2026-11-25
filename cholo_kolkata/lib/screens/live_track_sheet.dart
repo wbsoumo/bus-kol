@@ -307,6 +307,10 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
       _fetchLiveBuses();
     } catch (_) {}
 
+    final double tripProgress = activeStops.length > 1
+        ? (closestIdx / (activeStops.length - 1)).clamp(0.05, 0.95)
+        : 0.2;
+
     // Dispatch / update Where Is My Train style Ongoing Notification
     await _notifications.showLiveBusTrackingNotification(
       id: widget.routeId,
@@ -317,6 +321,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
       distanceToStopKm: distToNextKm,
       speedKmh: speedKmh,
       etaMinutes: etaMins,
+      progress: tripProgress,
     );
   }
 

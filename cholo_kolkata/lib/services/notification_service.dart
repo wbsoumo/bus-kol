@@ -1,41 +1,19 @@
-import 'dart:ui';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
-  bool _initialized = false;
+  static const MethodChannel _channel = MethodChannel('com.cholokolkata/live_notification');
 
   Future<void> init() async {
-    if (_initialized) return;
-
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const InitializationSettings initializationSettings =
-        InitializationSettings(android: initializationSettingsAndroid);
-
-    await _notificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // Notification tapped
-      },
-    );
-
-    // Request POST_NOTIFICATIONS permission on Android 13+
-    final androidPlugin = _notificationsPlugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    if (androidPlugin != null) {
-      await androidPlugin.requestNotificationsPermission();
-    }
-
-    _initialized = true;
+    // Channel initialization handled natively
   }
 
-  /// Show or dynamically update ongoing WIMT-style Live Bus Tracking Notification
+  /// Show or dynamically update ongoing Where Is My Train custom UI Live Notification
   Future<void> showLiveBusTrackingNotification({
     required int id,
     required String routeNo,
@@ -45,70 +23,50 @@ class NotificationService {
     required double distanceToStopKm,
     required double speedKmh,
     required int etaMinutes,
+    double progress = 0.25,
   }) async {
-    await init();
-
     final distStr = distanceToStopKm < 1.0
         ? '${(distanceToStopKm * 1000).round()} m'
         : '${distanceToStopKm.toStringAsFixed(1)} km';
-    final speedStr = speedKmh > 2 ? '${speedKmh.toStringAsFixed(0)} km/h' : 'Stationary';
+    final speedStr = speedKmh > 2
+        ? 'Speed: ${speedKmh.toStringAsFixed(0)} km/h • Kolkata Traffic Normal'
+        : 'Speed: Stationary • Kolkata Traffic Normal';
     final etaStr = etaMinutes > 60
-        ? '${etaMinutes ~/ 60} hr ${etaMinutes % 60} mins'
-        : '$etaMinutes mins';
+        ? '${etaMinutes ~/ 60} hr ${etaMinutes % 60} mins to $destination'
+        : '$etaMinutes mins to $destination';
 
-    final title = 'CholoKolkata • $routeNo • now';
-    final contentText = '$distStr to $nextStop';
-    final summaryText = '$origin ➔ $destination';
-    final bigText = '$distStr to $nextStop\n'
-        'Speed: $speedStr • Kolkata Traffic Normal\n\n'
-        '$origin ➔ $destination\n'
-        '~$etaStr to $destination';
+    // Calculate dynamic ETA arrival clock time
+    final now = DateTime.now();
+    final arrivalTime = now.add(Duration(minutes: etaMinutes));
+    final arrivalTimeStr = DateFormat('hh:mm a').format(arrivalTime);
 
-    final androidDetails = AndroidNotificationDetails(
-      'cholo_kolkata_live_tracking',
-      'Live Bus Trip Tracking',
-      channelDescription: 'Ongoing live bus status, next stop distance, speed and ETA',
-      importance: Importance.high,
-      priority: Priority.high,
-      ongoing: true,
-      autoCancel: false,
-      onlyAlertOnce: true,
-      showWhen: true,
-      color: const Color(0xFF00695C),
-      icon: '@mipmap/ic_launcher',
-      styleInformation: BigTextStyleInformation(
-        bigText,
-        htmlFormatBigText: false,
-        contentTitle: title,
-        htmlFormatContentTitle: false,
-        summaryText: summaryText,
-        htmlFormatSummaryText: false,
-      ),
-      actions: const <AndroidNotificationAction>[
-        AndroidNotificationAction(
-          'dismiss_tracking',
-          'Dismiss',
-          showsUserInterface: false,
-          cancelNotification: true,
-        ),
-      ],
-    );
-
-    final notificationDetails = NotificationDetails(android: androidDetails);
-
-    await _notificationsPlugin.show(
-      id,
-      title,
-      contentText,
-      notificationDetails,
-    );
+    try {
+      if (Platform.isAndroid) {
+        await _channel.invokeMethod('showCustomLiveNotification', {
+          'id': id,
+          'routeNo': routeNo,
+          'origin': origin,
+          'destination': destination,
+          'nextStop': nextStop,
+          'distStr': distStr,
+          'speedStr': speedStr,
+          'etaStr': etaStr,
+          'arrivalTimeStr': arrivalTimeStr,
+          'progress': progress,
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> cancelNotification(int id) async {
-    await _notificationsPlugin.cancel(id);
+    try {
+      if (Platform.isAndroid) {
+        await _channel.invokeMethod('cancelCustomLiveNotification', {'id': id});
+      }
+    } catch (_) {}
   }
 
   Future<void> cancelAll() async {
-    await _notificationsPlugin.cancelAll();
+    await cancelNotification(818);
   }
 }

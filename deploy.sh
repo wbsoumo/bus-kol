@@ -30,3 +30,4 @@ touch tmp/restart.txt
 
 echo "=== Deployment Finished Successfully! ==="
 echo "Visit http://cholokolkata.online/import-db?action=run to initialize the database."
+
