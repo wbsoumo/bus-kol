@@ -6,6 +6,10 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.core.content.FileProvider
+import java.io.File
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -110,6 +114,82 @@ class MainActivity : FlutterActivity() {
                     val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                     notificationManager.cancel(id)
                     result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        val updaterChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.cholokolkata/app_updater")
+        updaterChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getAppInfo" -> {
+                    try {
+                        val pInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+                        } else {
+                            @Suppress("DEPRECATION")
+                            packageManager.getPackageInfo(packageName, 0)
+                        }
+                        val vCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            pInfo.longVersionCode
+                        } else {
+                            @Suppress("DEPRECATION")
+                            pInfo.versionCode.toLong()
+                        }
+                        result.success(mapOf(
+                            "versionName" to (pInfo.versionName ?: "1.0.0"),
+                            "versionCode" to vCode.toInt()
+                        ))
+                    } catch (e: Exception) {
+                        result.success(mapOf("versionName" to "1.0.0", "versionCode" to 1))
+                    }
+                }
+                "getCacheDir" -> {
+                    result.success(cacheDir.absolutePath)
+                }
+                "openUrl" -> {
+                    val url = call.argument<String>("url") ?: ""
+                    val isPlayStore = call.argument<Boolean>("isPlayStore") ?: false
+                    try {
+                        if (isPlayStore && url.contains("id=")) {
+                            val idPart = url.substringAfter("id=").substringBefore("&")
+                            try {
+                                val marketIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$idPart")).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                startActivity(marketIntent)
+                                result.success(true)
+                                return@setMethodCallHandler
+                            } catch (_: Exception) {}
+                        }
+                        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(browserIntent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "installApk" -> {
+                    val filePath = call.argument<String>("filePath") ?: ""
+                    val file = File(filePath)
+                    if (!file.exists()) {
+                        result.error("NO_FILE", "Downloaded APK file not found", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+                        val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, "application/vnd.android.package-archive")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(installIntent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("INSTALL_ERR", e.message ?: "Failed to launch installer", null)
+                    }
                 }
                 else -> result.notImplemented()
             }

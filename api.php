@@ -815,6 +815,52 @@ if ($route === 'ota/bundle') {
 }
 
 // -------------------------------------------------------------
+// 8B. APP UPDATE CONFIG CHECK & APK DOWNLOAD
+// -------------------------------------------------------------
+if ($route === 'app/update-check') {
+    $cfg_file = __DIR__ . '/app_update_config.json';
+    $default_cfg = [
+        'enabled' => false,
+        'update_mode' => 'none',
+        'source' => 'direct',
+        'latest_version_code' => 1,
+        'latest_version_name' => '1.0.0',
+        'title' => 'New CholoKolkata Update Available',
+        'release_notes' => 'Bug fixes and performance improvements.',
+        'play_store_url' => 'https://play.google.com/store/apps/details?id=com.cholokolkata.cholo_kolkata',
+        'download_url' => 'http://cholokolkata.online/CholoKolkata.apk',
+    ];
+    if (file_exists($cfg_file)) {
+        $loaded = json_decode(file_get_contents($cfg_file), true);
+        if (is_array($loaded)) {
+            $default_cfg = array_merge($default_cfg, $loaded);
+        }
+    }
+    echo json_encode(secure_encrypt([
+        'success' => true,
+        'config' => $default_cfg,
+    ]));
+    exit;
+}
+
+if ($route === 'app/download') {
+    $apk = __DIR__ . '/CholoKolkata.apk';
+    if (!file_exists($apk)) {
+        $apk = __DIR__ . '/CholoKolkata-release.apk';
+    }
+    if (file_exists($apk)) {
+        header('Content-Type: application/vnd.android.package-archive');
+        header('Content-Disposition: attachment; filename="CholoKolkata.apk"');
+        header('Content-Length: ' . filesize($apk));
+        readfile($apk);
+        exit;
+    }
+    http_response_code(404);
+    echo json_encode(['success' => false, 'error' => 'APK not found']);
+    exit;
+}
+
+// -------------------------------------------------------------
 // 9. ADMIN API: ADD ROUTE VIA REST API
 // -------------------------------------------------------------
 if ($route === 'admin/route/add' && $_SERVER['REQUEST_METHOD'] === 'POST') {

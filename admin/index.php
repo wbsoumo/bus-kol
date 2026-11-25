@@ -360,6 +360,51 @@ if ($action === 'bump_sync' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+// 8. API Action: Save App Update Config (Force / Optional, Play Store / Direct APK)
+if ($action === 'save_app_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=utf-8');
+    $mode = trim($_POST['update_mode'] ?? 'none');
+    if (!in_array($mode, ['none', 'optional', 'force'])) {
+        $mode = 'none';
+    }
+    $source = trim($_POST['source'] ?? 'direct');
+    if (!in_array($source, ['playstore', 'direct'])) {
+        $source = 'direct';
+    }
+    $vcode = max(1, intval($_POST['latest_version_code'] ?? 1));
+    $vname = trim($_POST['latest_version_name'] ?? '1.0.0');
+    $title = trim($_POST['title'] ?? 'New CholoKolkata Update Available');
+    $notes = trim($_POST['release_notes'] ?? '');
+    $play_url = trim($_POST['play_store_url'] ?? 'https://play.google.com/store/apps/details?id=com.cholokolkata.cholo_kolkata');
+    $dl_url = trim($_POST['download_url'] ?? 'http://cholokolkata.online/CholoKolkata.apk');
+
+    $cfg = [
+        'enabled' => ($mode !== 'none'),
+        'update_mode' => $mode,
+        'source' => $source,
+        'latest_version_code' => $vcode,
+        'latest_version_name' => $vname ?: '1.0.0',
+        'title' => $title ?: 'New CholoKolkata Update Available',
+        'release_notes' => $notes,
+        'play_store_url' => $play_url ?: 'https://play.google.com/store/apps/details?id=com.cholokolkata.cholo_kolkata',
+        'download_url' => $dl_url ?: 'http://cholokolkata.online/CholoKolkata.apk',
+        'updated_at' => date('Y-m-d H:i:s T'),
+    ];
+
+    $cfg_file = __DIR__ . '/../app_update_config.json';
+    if (@file_put_contents($cfg_file, json_encode($cfg, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES))) {
+        $label = $mode === 'force' ? 'FORCE UPDATE' : ($mode === 'optional' ? 'OPTIONAL UPDATE' : 'DISABLED');
+        echo json_encode([
+            'success' => true,
+            'message' => "App update settings saved ($label • v$vname+$vcode via " . ($source === 'playstore' ? 'Play Store' : 'Direct APK') . ").",
+            'config' => $cfg,
+        ]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Failed to write app_update_config.json']);
+    }
+    exit;
+}
+
 // -----------------------------------------------------------------------------
 // HTML DASHBOARD RENDERING
 // -----------------------------------------------------------------------------
@@ -385,8 +430,28 @@ if ($db) {
 
 // Search and Pagination for Routes
 $active_tab = trim($_GET['tab'] ?? 'routes');
-if (!in_array($active_tab, ['routes', 'analytics', 'chat'])) {
+if (!in_array($active_tab, ['routes', 'analytics', 'chat', 'app_update'])) {
     $active_tab = 'routes';
+}
+
+$app_update_cfg = [
+    'enabled' => false,
+    'update_mode' => 'none',
+    'source' => 'direct',
+    'latest_version_code' => 1,
+    'latest_version_name' => '1.0.0',
+    'title' => 'New CholoKolkata Update Available',
+    'release_notes' => 'Improved 100% offline bus search, faster route loading, and bug fixes.',
+    'play_store_url' => 'https://play.google.com/store/apps/details?id=com.cholokolkata.cholo_kolkata',
+    'download_url' => 'http://cholokolkata.online/CholoKolkata.apk',
+    'updated_at' => '',
+];
+$cfg_path = __DIR__ . '/../app_update_config.json';
+if (file_exists($cfg_path)) {
+    $parsed_cfg = json_decode(file_get_contents($cfg_path), true);
+    if (is_array($parsed_cfg)) {
+        $app_update_cfg = array_merge($app_update_cfg, $parsed_cfg);
+    }
 }
 $search_query = trim($_GET['q'] ?? '');
 $filter_type = trim($_GET['type'] ?? '');
@@ -678,6 +743,14 @@ function togglePass() {
             </a>
             <a href="/admin?tab=chat" class="px-4 py-2 rounded-xl text-xs font-extrabold transition <?= $active_tab === 'chat' ? 'royal-gradient text-white shadow' : 'text-slate-600 hover:bg-slate-100' ?>">
                 💬 Chat IP & Location Logs
+            </a>
+            <a href="/admin?tab=app_update" class="px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 <?= $active_tab === 'app_update' ? 'royal-gradient text-white shadow' : 'text-slate-600 hover:bg-slate-100' ?>">
+                <span>📲 App Update</span>
+                <?php if ($app_update_cfg['enabled'] && $app_update_cfg['update_mode'] === 'force'): ?>
+                    <span class="px-1.5 py-0.5 text-[9px] rounded-full bg-red-500 text-white font-black">FORCE</span>
+                <?php elseif ($app_update_cfg['enabled'] && $app_update_cfg['update_mode'] === 'optional'): ?>
+                    <span class="px-1.5 py-0.5 text-[9px] rounded-full bg-emerald-500 text-white font-black">LIVE</span>
+                <?php endif; ?>
             </a>
         </div>
 
@@ -975,6 +1048,88 @@ function togglePass() {
                     </tbody>
                 </table>
             </div>
+        </div>
+        <?php elseif ($active_tab === 'app_update'): ?>
+        <!-- APP UPDATE MANAGER (FORCE / OPTIONAL, PLAY STORE / IN-APP APK) -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden max-w-3xl">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                    <h2 class="font-extrabold text-slate-900 text-sm">Mobile App Update Manager</h2>
+                    <p class="text-xs text-slate-500">Push a Force Update or Optional Update via Google Play Store or Direct In-App APK Download.</p>
+                </div>
+                <span class="px-2.5 py-1 rounded-full text-[11px] font-black uppercase <?= $app_update_cfg['update_mode'] === 'force' ? 'bg-red-100 text-red-700' : ($app_update_cfg['update_mode'] === 'optional' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500') ?>">
+                    <?= htmlspecialchars($app_update_cfg['update_mode'] === 'none' ? 'Disabled' : strtoupper($app_update_cfg['update_mode'])) ?>
+                </span>
+            </div>
+
+            <form id="appUpdateForm" onsubmit="submitAppUpdate(event)" class="p-6 space-y-5 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-bold text-slate-700 uppercase mb-1.5">Update Mode *</label>
+                        <select name="update_mode" id="au_mode" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-800">
+                            <option value="none" <?= $app_update_cfg['update_mode'] === 'none' ? 'selected' : '' ?>>⛔ Off (No Update Prompt)</option>
+                            <option value="optional" <?= $app_update_cfg['update_mode'] === 'optional' ? 'selected' : '' ?>>🔔 Optional Update (User can tap Later)</option>
+                            <option value="force" <?= $app_update_cfg['update_mode'] === 'force' ? 'selected' : '' ?>>🚨 Force Update (Blocks app until updated)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 uppercase mb-1.5">Distribution Source *</label>
+                        <select name="source" id="au_source" onchange="toggleUpdateSourceFields()" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-800">
+                            <option value="playstore" <?= $app_update_cfg['source'] === 'playstore' ? 'selected' : '' ?>>▶️ Google Play Store</option>
+                            <option value="direct" <?= $app_update_cfg['source'] === 'direct' ? 'selected' : '' ?>>📥 In-App Direct APK Download</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-bold text-slate-700 uppercase mb-1.5">Target Version Code (Build #) *</label>
+                        <input type="number" min="1" name="latest_version_code" required value="<?= intval($app_update_cfg['latest_version_code']) ?>"
+                            class="w-full px-3 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-900">
+                        <p class="text-[11px] text-slate-400 mt-1">Devices with build &lt; this number will see the update prompt (current APK is 1).</p>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 uppercase mb-1.5">Target Version Name *</label>
+                        <input type="text" name="latest_version_name" required value="<?= htmlspecialchars($app_update_cfg['latest_version_name']) ?>" placeholder="e.g. 1.0.1"
+                            class="w-full px-3 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-900">
+                    </div>
+                </div>
+
+                <div id="au_playstore_box">
+                    <label class="block font-bold text-slate-700 uppercase mb-1.5">Google Play Store URL</label>
+                    <input type="url" name="play_store_url" value="<?= htmlspecialchars($app_update_cfg['play_store_url']) ?>"
+                        placeholder="https://play.google.com/store/apps/details?id=com.cholokolkata.cholo_kolkata"
+                        class="w-full px-3 py-2.5 rounded-xl border border-slate-200 font-mono text-slate-800">
+                </div>
+
+                <div id="au_direct_box">
+                    <label class="block font-bold text-slate-700 uppercase mb-1.5">Direct APK Download Link (In-App)</label>
+                    <input type="url" name="download_url" value="<?= htmlspecialchars($app_update_cfg['download_url']) ?>"
+                        placeholder="http://cholokolkata.online/CholoKolkata.apk"
+                        class="w-full px-3 py-2.5 rounded-xl border border-slate-200 font-mono text-slate-800">
+                    <p class="text-[11px] text-slate-400 mt-1">App streams this APK inside the update dialog with a live progress bar &amp; launches Android installer.</p>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-700 uppercase mb-1.5">Dialog Title *</label>
+                    <input type="text" name="title" required value="<?= htmlspecialchars($app_update_cfg['title']) ?>"
+                        class="w-full px-3 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-900">
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-700 uppercase mb-1.5">Release Notes / What's New</label>
+                    <textarea name="release_notes" rows="3" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 font-medium text-slate-800"><?= htmlspecialchars($app_update_cfg['release_notes']) ?></textarea>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span class="text-[11px] text-slate-400">
+                        <?= !empty($app_update_cfg['updated_at']) ? 'Last updated: ' . htmlspecialchars($app_update_cfg['updated_at']) : '' ?>
+                    </span>
+                    <button type="submit" id="auSubmitBtn" class="px-5 py-2.5 royal-gradient text-white font-extrabold rounded-xl shadow-lg shadow-blue-500/20 hover:opacity-95 transition">
+                        Save &amp; Push App Update
+                    </button>
+                </div>
+            </form>
         </div>
         <?php endif; ?>
 
@@ -1402,6 +1557,40 @@ async function triggerOtaBump() {
         showToast('Error publishing OTA update', true);
     } finally {
         btn.textContent = 'Publish OTA Sync';
+    }
+}
+
+function toggleUpdateSourceFields() {
+    const srcEl = document.getElementById('au_source');
+    if (!srcEl) return;
+    const isPlay = srcEl.value === 'playstore';
+    const psBox = document.getElementById('au_playstore_box');
+    const dlBox = document.getElementById('au_direct_box');
+    if (psBox) psBox.style.opacity = isPlay ? '1' : '0.55';
+    if (dlBox) dlBox.style.opacity = isPlay ? '0.55' : '1';
+}
+document.addEventListener('DOMContentLoaded', toggleUpdateSourceFields);
+
+async function submitAppUpdate(e) {
+    e.preventDefault();
+    const btn = document.getElementById('auSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    const formData = new FormData(e.target);
+    try {
+        const res = await fetch('/admin?action=save_app_update', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message);
+            setTimeout(() => window.location.reload(), 900);
+        } else {
+            showToast(data.error || 'Failed to save update config', true);
+        }
+    } catch (err) {
+        showToast('Network error saving update config', true);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save & Push App Update';
     }
 }
 </script>

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cholo_kolkata/services/app_update_service.dart';
 import 'package:cholo_kolkata/services/bus_data_service.dart';
 import 'package:cholo_kolkata/services/kolkata_stops.dart';
 import 'package:cholo_kolkata/services/search_analytics_service.dart';
@@ -133,5 +134,38 @@ void main() {
     );
     expect(flushedCount, 2);
     expect(await svc.getPendingSearches(), isEmpty);
+  });
+
+  test('AppUpdateConfig evaluates force/optional and Play Store/Direct correctly', () {
+    final forceDirect = AppUpdateConfig.fromJson({
+      'enabled': true,
+      'update_mode': 'force',
+      'source': 'direct',
+      'latest_version_code': 2,
+      'latest_version_name': '1.0.1',
+      'download_url': 'http://cholokolkata.online/CholoKolkata.apk',
+    });
+    expect(forceDirect.isForce, isTrue);
+    expect(forceDirect.isPlayStore, isFalse);
+    expect(forceDirect.shouldPrompt(1), isTrue);
+    expect(forceDirect.shouldPrompt(2), isFalse);
+
+    final optionalPlay = AppUpdateConfig.fromJson({
+      'enabled': true,
+      'update_mode': 'optional',
+      'source': 'playstore',
+      'latest_version_code': 3,
+      'latest_version_name': '1.0.2',
+    });
+    expect(optionalPlay.isForce, isFalse);
+    expect(optionalPlay.isPlayStore, isTrue);
+    expect(optionalPlay.shouldPrompt(2), isTrue);
+
+    final disabled = AppUpdateConfig.fromJson({
+      'enabled': false,
+      'update_mode': 'none',
+      'latest_version_code': 5,
+    });
+    expect(disabled.shouldPrompt(1), isFalse);
   });
 }

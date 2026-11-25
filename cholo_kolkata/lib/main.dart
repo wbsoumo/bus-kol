@@ -8,6 +8,7 @@ import 'screens/settings_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/live_track_sheet.dart';
 import 'services/api_service.dart';
+import 'services/app_update_service.dart';
 import 'services/notification_service.dart';
 import 'services/search_analytics_service.dart';
 import 'services/settings_service.dart';
@@ -81,6 +82,11 @@ class _MainHomeScreenState extends State<MainHomeScreen>
     _tabController = TabController(length: 2, vsync: this);
     _checkForOtaUpdates();
     SearchAnalyticsService().flushQueue();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AppUpdateService().checkForUpdate(context);
+      }
+    });
 
     // Listen for notification clicks to deep-link directly to live track screen
     NotificationService().onNotificationClicked = (data) {
@@ -127,6 +133,9 @@ class _MainHomeScreenState extends State<MainHomeScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       SearchAnalyticsService().flushQueue();
+      if (mounted) {
+        AppUpdateService().checkForUpdate(context);
+      }
     }
   }
 

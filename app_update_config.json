@@ -1,0 +1,12 @@
+{
+  "enabled": false,
+  "update_mode": "optional",
+  "source": "direct",
+  "latest_version_code": 1,
+  "latest_version_name": "1.0.0",
+  "title": "New CholoKolkata Update Available",
+  "release_notes": "Improved 100% offline bus search, faster route loading, and bug fixes.",
+  "play_store_url": "https://play.google.com/store/apps/details?id=com.cholokolkata.cholo_kolkata",
+  "download_url": "http://cholokolkata.online/CholoKolkata.apk",
+  "updated_at": "2026-11-25 23:35:00 IST"
+}

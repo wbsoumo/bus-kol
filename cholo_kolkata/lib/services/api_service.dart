@@ -361,6 +361,19 @@ class ApiService {
     };
   }
 
+  /// 9b. App Update Config Check (Force / Optional, Play Store / Direct APK)
+  Future<Map<String, dynamic>?> checkAppUpdate() async {
+    try {
+      final data = await _secureGet('/api/app/update-check');
+      if (data['success'] == true && data['config'] is Map) {
+        return Map<String, dynamic>.from(data['config'] as Map);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// 10. Crowdsourced "Inside The Bus" Live Location Ping
   Future<bool> sendBusPing({
     required int routeId,
