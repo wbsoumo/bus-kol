@@ -88,6 +88,8 @@ class SettingsService extends ChangeNotifier {
   String _lastFromStop = 'Howrah Station';
   String _lastToStop = 'Sector V';
   String _lastBusNo = '215A';
+  String _lastFromMetroStation = 'Howrah Maidan';
+  String _lastToMetroStation = 'Esplanade';
 
   bool get isFirstTimeLaunch => _isFirstTimeLaunch;
   String get currentThemeId => _currentThemeId;
@@ -99,6 +101,8 @@ class SettingsService extends ChangeNotifier {
   String get lastFromStop => _lastFromStop;
   String get lastToStop => _lastToStop;
   String get lastBusNo => _lastBusNo;
+  String get lastFromMetroStation => _lastFromMetroStation;
+  String get lastToMetroStation => _lastToMetroStation;
 
   Future<void> init() async {
     if (_isInitialized) return;
@@ -112,6 +116,8 @@ class SettingsService extends ChangeNotifier {
     _lastFromStop = _prefs.getString('last_from_stop') ?? 'Howrah Station';
     _lastToStop = _prefs.getString('last_to_stop') ?? 'Sector V';
     _lastBusNo = _prefs.getString('last_bus_no') ?? '215A';
+    _lastFromMetroStation = _prefs.getString('last_from_metro') ?? 'Howrah Maidan';
+    _lastToMetroStation = _prefs.getString('last_to_metro') ?? 'Esplanade';
 
     _isInitialized = true;
     notifyListeners();
@@ -171,13 +177,29 @@ class SettingsService extends ChangeNotifier {
     }
   }
 
+  Future<void> saveLastMetroSearch(String from, String to) async {
+    if (from.trim().isNotEmpty) {
+      _lastFromMetroStation = from.trim();
+      await _prefs.setString('last_from_metro', _lastFromMetroStation);
+    }
+    if (to.trim().isNotEmpty) {
+      _lastToMetroStation = to.trim();
+      await _prefs.setString('last_to_metro', _lastToMetroStation);
+    }
+    notifyListeners();
+  }
+
   Future<void> clearHistory() async {
     await _prefs.remove('last_from_stop');
     await _prefs.remove('last_to_stop');
     await _prefs.remove('last_bus_no');
+    await _prefs.remove('last_from_metro');
+    await _prefs.remove('last_to_metro');
     _lastFromStop = 'Howrah Station';
     _lastToStop = 'Sector V';
     _lastBusNo = '215A';
+    _lastFromMetroStation = 'Howrah Maidan';
+    _lastToMetroStation = 'Esplanade';
     notifyListeners();
   }
 

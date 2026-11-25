@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'screens/spot_bus_screen.dart';
 import 'screens/metro_screen.dart';
 import 'screens/chat_screen.dart';
@@ -64,6 +65,8 @@ class MainHomeScreen extends StatefulWidget {
 
 class _MainHomeScreenState extends State<MainHomeScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  DateTime? _lastBackPressTime;
   final ApiService _api = ApiService();
   final SettingsService _settings = SettingsService();
   String _otaNotice = '';
@@ -137,7 +140,57 @@ class _MainHomeScreenState extends State<MainHomeScreen> with SingleTickerProvid
       builder: (context, _) {
         final currentTheme = _settings.currentTheme;
 
-        return Scaffold(
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) return;
+
+            // 1. If drawer is open, close drawer
+            if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+              _scaffoldKey.currentState?.closeDrawer();
+              return;
+            }
+
+            // 2. Dismiss any active keyboard or input focus
+            FocusScope.of(context).unfocus();
+
+            // 3. If on METRO tab, return to BUSES tab
+            if (_tabController.index != 0) {
+              _tabController.animateTo(0);
+              return;
+            }
+
+            // 4. Double tap within 2 seconds to exit app
+            final now = DateTime.now();
+            if (_lastBackPressTime == null ||
+                now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+              _lastBackPressTime = now;
+              ScaffoldMessenger.of(context).removeCurrentSnackBar();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.white, size: 18),
+                      SizedBox(width: 10),
+                      Text(
+                        'Press back again to exit CholoKolkata',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  backgroundColor: const Color(0xFF1E293B),
+                  margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                ),
+              );
+            } else {
+              SystemNavigator.pop();
+            }
+          },
+          child: Scaffold(
+            key: _scaffoldKey,
           appBar: AppBar(
             backgroundColor: currentTheme.primary,
             elevation: 0,
@@ -389,8 +442,9 @@ class _MainHomeScreenState extends State<MainHomeScreen> with SingleTickerProvid
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5),
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 }

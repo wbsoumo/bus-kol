@@ -135,6 +135,29 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
     } catch (_) {}
   }
 
+  void _tryLocalFallback() {
+    final localData = BusDataService().getRouteDetails(
+      widget.routeNo,
+      from: widget.initialFrom,
+      to: widget.initialTo,
+      busType: widget.busType,
+    );
+    if (localData != null && (localData['stops'] as List).isNotEmpty) {
+      setState(() {
+        _routeData = localData['route'] ?? _routeData;
+        _stops = (localData['stops'] as List? ?? []);
+        _isLoading = false;
+        _error = '';
+        _updateIndices();
+      });
+    } else {
+      setState(() {
+        _error = 'Could not load stop timeline';
+        _isLoading = false;
+      });
+    }
+  }
+
   void _fetchDetails() async {
     try {
       final data = await _api.getRouteDetails(widget.routeId);
@@ -149,14 +172,12 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
           _error = '';
           _updateIndices();
         });
+      } else if (_stops.isEmpty) {
+        _tryLocalFallback();
       }
     } catch (e) {
-      // If we already have stops loaded from local BusDataService, never show error
       if (mounted && _stops.isEmpty) {
-        setState(() {
-          _error = 'Could not load stop timeline';
-          _isLoading = false;
-        });
+        _tryLocalFallback();
       }
     }
   }

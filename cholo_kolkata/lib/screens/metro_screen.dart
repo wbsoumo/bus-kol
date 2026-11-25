@@ -15,18 +15,21 @@ class MetroScreen extends StatefulWidget {
 
 class _MetroScreenState extends State<MetroScreen> {
   final ApiService _api = ApiService();
+  final SettingsService _settings = SettingsService();
 
   // Instant 0ms In-Memory Preload
   List<MetroStation> _stations = MetroService.defaultMetroStations;
 
-  String? _fromStation = 'Howrah Maidan';
-  String? _toStation = 'Esplanade';
+  String? _fromStation;
+  String? _toStation;
 
   String _alertMessage = '';
 
   @override
   void initState() {
     super.initState();
+    _fromStation = _settings.lastFromMetroStation;
+    _toStation = _settings.lastToMetroStation;
     _syncMetroData();
   }
 
@@ -49,6 +52,9 @@ class _MetroScreenState extends State<MetroScreen> {
       _fromStation = _toStation;
       _toStation = temp;
     });
+    if (_fromStation != null && _toStation != null) {
+      _settings.saveLastMetroSearch(_fromStation!, _toStation!);
+    }
   }
 
   void _planJourney() {
@@ -61,6 +67,7 @@ class _MetroScreenState extends State<MetroScreen> {
       return;
     }
 
+    _settings.saveLastMetroSearch(_fromStation!, _toStation!);
     setState(() => _alertMessage = '');
 
     // Calculate instant 0ms plan and navigate to dedicated MetroResultScreen
@@ -79,6 +86,7 @@ class _MetroScreenState extends State<MetroScreen> {
       _toStation = to;
       _alertMessage = '';
     });
+    _settings.saveLastMetroSearch(from, to);
     final plan = MetroService.planJourney(from, to);
     Navigator.push(
       context,
@@ -140,7 +148,12 @@ class _MetroScreenState extends State<MetroScreen> {
                                 child: Text('${s.stationName}$bn', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
                               );
                             }).toList(),
-                            onChanged: (val) => setState(() => _fromStation = val),
+                            onChanged: (val) {
+                              setState(() => _fromStation = val);
+                              if (val != null && _toStation != null) {
+                                _settings.saveLastMetroSearch(val, _toStation!);
+                              }
+                            },
                           ),
                         ),
                       ),
@@ -202,7 +215,12 @@ class _MetroScreenState extends State<MetroScreen> {
                                 child: Text('${s.stationName}$bn', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
                               );
                             }).toList(),
-                            onChanged: (val) => setState(() => _toStation = val),
+                            onChanged: (val) {
+                              setState(() => _toStation = val);
+                              if (val != null && _fromStation != null) {
+                                _settings.saveLastMetroSearch(_fromStation!, val);
+                              }
+                            },
                           ),
                         ),
                       ),
