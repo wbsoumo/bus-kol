@@ -33,12 +33,14 @@ function get_db() {
     $pass = 'Soumojit1234@';
     $dbname = 'helnovexaa_buskolkata';
 
-    $conn = @new mysqli($host, $user, $pass, $dbname);
-    if ($conn->connect_error) {
+    $conn = mysqli_init();
+    $conn->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, 1);
+    $connected = @$conn->real_connect($host, $user, $pass, $dbname);
+    if (!$connected) {
         // Fallback for local testing
-        $conn = @new mysqli('127.0.0.1', 'root', '', 'kolkata_bus_db');
+        $connected = @$conn->real_connect('127.0.0.1', 'root', '', 'kolkata_bus_db');
     }
-    if ($conn->connect_error) {
+    if (!$connected) {
         echo json_encode(secure_encrypt(['success' => false, 'error' => 'Database connection failed']));
         exit;
     }
@@ -360,25 +362,40 @@ if ($route === 'metro/plan') {
     // Fetch intermediate stations
     $low = min((int)$stn1['station_order'], (int)$stn2['station_order']);
     $high = max((int)$stn1['station_order'], (int)$stn2['station_order']);
-    $inter_stmt = $db->prepare("SELECT station_name, station_bengali, interchange_info FROM metro_stations WHERE line_id = ? AND station_order BETWEEN ? AND ? ORDER BY station_order ASC");
+    $inter_stmt = $db->prepare("
+        SELECT s.station_name, s.station_bengali, s.line_id, l.line_name, l.line_color, s.distance_km, s.interchange_info 
+        FROM metro_stations s 
+        JOIN metro_lines l ON s.line_id = l.line_id 
+        WHERE s.line_id = ? AND s.station_order BETWEEN ? AND ? 
+        ORDER BY s.station_order ASC
+    ");
     $inter_stmt->bind_param('sii', $stn1['line_id'], $low, $high);
     $inter_stmt->execute();
     $inter_res = $inter_stmt->get_result();
     $path = [];
     while ($p = $inter_res->fetch_assoc()) {
+        $p['distance_km'] = (float)$p['distance_km'];
         $path[] = $p;
     }
+    if ((int)$stn1['station_order'] > (int)$stn2['station_order']) {
+        $path = array_reverse($path);
+    }
 
-    echo json_encode(secure_encrypt([
-        'success' => true,
+    $plan = [
+        'type' => $same_line ? 'DIRECT' : 'INTERCHANGE',
         'from_station' => $from,
         'to_station' => $to,
-        'fare' => $fare,
-        'total_stations' => $stations_count,
-        'distance_km' => round($dist, 2),
-        'est_time_mins' => round($stations_count * 2.2),
-        'path' => $path
-    ]));
+        'fare' => (int)$fare,
+        'fare_text' => "₹$fare",
+        'stations_count' => (int)$stations_count,
+        'distance_km' => round((float)$dist, 2),
+        'duration_mins' => round((float)$stations_count * 2.2),
+        'line_name' => $stn1['line_name'] ?? 'Metro Corridor',
+        'line_color' => $stn1['line_color'] ?? '#00897B',
+        'stations' => $path
+    ];
+
+    echo json_encode(secure_encrypt(['success' => true, 'plan' => $plan]));
     exit;
 }
 
@@ -514,3 +531,4 @@ if ($route === 'ota/check') {
 // Default Fallback
 echo json_encode(secure_encrypt(['success' => true, 'api' => 'CholoKolkata Transit API 2.4.0']));
 exit;
+

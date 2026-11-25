@@ -152,18 +152,20 @@ class MetroLine {
 
   factory MetroLine.fromJson(Map<String, dynamic> json) {
     return MetroLine(
-      lineId: json['line_id'] ?? '',
+      lineId: json['line_id']?.toString() ?? '',
       lineNumber: json['line_number']?.toString() ?? '',
-      lineName: json['line_name'] ?? '',
-      lineColor: json['line_color'] ?? '#00897B',
-      terminalFrom: json['terminal_from'] ?? '',
-      terminalTo: json['terminal_to'] ?? '',
-      firstTrain: json['first_train'] ?? '',
-      lastTrain: json['last_train'] ?? '',
-      peakHeadway: json['peak_headway'] ?? '',
-      offpeakHeadway: json['offpeak_headway'] ?? '',
-      totalStations: json['total_stations'] ?? 0,
-      specialFeature: json['special_feature'] ?? '',
+      lineName: json['line_name']?.toString() ?? '',
+      lineColor: json['line_color']?.toString() ?? '#00897B',
+      terminalFrom: json['terminal_from']?.toString() ?? '',
+      terminalTo: json['terminal_to']?.toString() ?? '',
+      firstTrain: json['first_train']?.toString() ?? '',
+      lastTrain: json['last_train']?.toString() ?? '',
+      peakHeadway: json['peak_headway']?.toString() ?? '',
+      offpeakHeadway: json['offpeak_headway']?.toString() ?? '',
+      totalStations: (json['total_stations'] is num)
+          ? (json['total_stations'] as num).toInt()
+          : (int.tryParse(json['total_stations']?.toString() ?? '0') ?? 0),
+      specialFeature: json['special_feature']?.toString() ?? '',
     );
   }
 }
@@ -189,13 +191,15 @@ class MetroStation {
 
   factory MetroStation.fromJson(Map<String, dynamic> json) {
     return MetroStation(
-      stationName: json['station_name'] ?? '',
-      stationBengali: json['station_bengali'],
-      lineId: json['line_id'] ?? '',
-      lineName: json['line_name'] ?? '',
-      lineColor: json['line_color'] ?? '#00897B',
-      distanceKm: (json['distance_km'] is num) ? (json['distance_km'] as num).toDouble() : 0.0,
-      interchangeInfo: json['interchange_info'],
+      stationName: json['station_name']?.toString() ?? '',
+      stationBengali: json['station_bengali']?.toString(),
+      lineId: json['line_id']?.toString() ?? '',
+      lineName: json['line_name']?.toString() ?? '',
+      lineColor: json['line_color']?.toString() ?? '#00897B',
+      distanceKm: (json['distance_km'] is num)
+          ? (json['distance_km'] as num).toDouble()
+          : (double.tryParse(json['distance_km']?.toString() ?? '0.0') ?? 0.0),
+      interchangeInfo: json['interchange_info']?.toString(),
     );
   }
 }
@@ -234,18 +238,26 @@ class MetroPlan {
   factory MetroPlan.fromJson(Map<String, dynamic> json) {
     var rawStns = json['stations'] as List? ?? [];
     return MetroPlan(
-      type: json['type'] ?? 'DIRECT',
-      fromStation: json['from_station'] ?? '',
-      toStation: json['to_station'] ?? '',
-      stationsCount: json['stations_count'] ?? 0,
-      distanceKm: (json['distance_km'] is num) ? (json['distance_km'] as num).toDouble() : 0.0,
-      durationMins: json['duration_mins'] ?? 0,
-      fare: json['fare'] ?? 10,
-      fareText: json['fare_text'] ?? '₹10',
-      instructions: json['instructions'],
-      interchangeStation: json['interchange_station'],
-      lineName: json['line_name'],
-      lineColor: json['line_color'],
+      type: json['type']?.toString() ?? 'DIRECT',
+      fromStation: json['from_station']?.toString() ?? '',
+      toStation: json['to_station']?.toString() ?? '',
+      stationsCount: (json['stations_count'] is num)
+          ? (json['stations_count'] as num).toInt()
+          : (int.tryParse(json['stations_count']?.toString() ?? '0') ?? 0),
+      distanceKm: (json['distance_km'] is num)
+          ? (json['distance_km'] as num).toDouble()
+          : (double.tryParse(json['distance_km']?.toString() ?? '0.0') ?? 0.0),
+      durationMins: (json['duration_mins'] is num)
+          ? (json['duration_mins'] as num).toInt()
+          : (int.tryParse(json['duration_mins']?.toString() ?? '0') ?? 0),
+      fare: (json['fare'] is num)
+          ? (json['fare'] as num).toInt()
+          : (int.tryParse(json['fare']?.toString() ?? '10') ?? 10),
+      fareText: json['fare_text']?.toString() ?? '₹${json['fare'] ?? 10}',
+      instructions: json['instructions']?.toString(),
+      interchangeStation: json['interchange_station']?.toString(),
+      lineName: json['line_name']?.toString(),
+      lineColor: json['line_color']?.toString(),
       stations: rawStns.map((s) => MetroStation.fromJson(s)).toList(),
     );
   }
