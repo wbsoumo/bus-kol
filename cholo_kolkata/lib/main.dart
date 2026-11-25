@@ -9,6 +9,7 @@ import 'screens/onboarding_screen.dart';
 import 'screens/live_track_sheet.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
+import 'services/search_analytics_service.dart';
 import 'services/settings_service.dart';
 import 'services/bus_data_service.dart';
 
@@ -63,7 +64,8 @@ class MainHomeScreen extends StatefulWidget {
   State<MainHomeScreen> createState() => _MainHomeScreenState();
 }
 
-class _MainHomeScreenState extends State<MainHomeScreen> with SingleTickerProviderStateMixin {
+class _MainHomeScreenState extends State<MainHomeScreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   DateTime? _lastBackPressTime;
@@ -74,9 +76,11 @@ class _MainHomeScreenState extends State<MainHomeScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Only 2 Top Tabs: BUSES and METRO (Where is My Train exact model)
     _tabController = TabController(length: 2, vsync: this);
     _checkForOtaUpdates();
+    SearchAnalyticsService().flushQueue();
 
     // Listen for notification clicks to deep-link directly to live track screen
     NotificationService().onNotificationClicked = (data) {
@@ -120,7 +124,15 @@ class _MainHomeScreenState extends State<MainHomeScreen> with SingleTickerProvid
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      SearchAnalyticsService().flushQueue();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
   }

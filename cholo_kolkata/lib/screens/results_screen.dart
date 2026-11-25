@@ -3,6 +3,7 @@ import '../models/models.dart';
 import '../services/api_service.dart';
 import '../services/bus_data_service.dart';
 import '../services/bus_photo_service.dart';
+import '../services/search_analytics_service.dart';
 import '../services/settings_service.dart';
 import '../widgets/bus_photo_viewer.dart';
 import 'live_track_sheet.dart';
@@ -58,6 +59,15 @@ class _ResultsScreenState extends State<ResultsScreen> {
       _isLoading = false;
       _error = '';
     });
+
+    // Record search locally and silently upload in background batch
+    SearchAnalyticsService().recordSearch(
+      mode: _isBusNoSearch ? 'bus_no' : 'bus_route',
+      from: _isBusNoSearch ? '' : _currentFrom,
+      to: _isBusNoSearch ? '' : _currentTo,
+      busNo: _isBusNoSearch ? _currentFrom : '',
+      resultsCount: localDirect.length + localTransfers.length,
+    );
 
     // 2. Optional silent background sync (never blocks UI or shows offline errors)
     try {

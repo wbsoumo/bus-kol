@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import '../services/metro_service.dart';
+import '../services/search_analytics_service.dart';
 import '../services/settings_service.dart';
 import 'metro_result_screen.dart';
 import 'drawer_pages.dart';
@@ -72,6 +73,12 @@ class _MetroScreenState extends State<MetroScreen> {
 
     // Calculate instant 0ms plan and navigate to dedicated MetroResultScreen
     final plan = MetroService.planJourney(_fromStation!, _toStation!);
+    SearchAnalyticsService().recordSearch(
+      mode: 'metro',
+      from: _fromStation!,
+      to: _toStation!,
+      resultsCount: plan.stationsCount,
+    );
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -88,6 +95,12 @@ class _MetroScreenState extends State<MetroScreen> {
     });
     _settings.saveLastMetroSearch(from, to);
     final plan = MetroService.planJourney(from, to);
+    SearchAnalyticsService().recordSearch(
+      mode: 'metro',
+      from: from,
+      to: to,
+      resultsCount: plan.stationsCount,
+    );
     Navigator.push(
       context,
       MaterialPageRoute(

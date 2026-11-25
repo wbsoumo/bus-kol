@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cholo_kolkata/services/bus_data_service.dart';
 import 'package:cholo_kolkata/services/kolkata_stops.dart';
+import 'package:cholo_kolkata/services/search_analytics_service.dart';
 
 void main() {
   setUpAll(() {
@@ -92,5 +93,45 @@ void main() {
     expect(ok, isTrue);
     expect(BusDataService().dataVersion, '2.4.9');
     expect(BusDataService().searchBusNumbers('99X'), isNotEmpty);
+  });
+
+  test('SearchAnalyticsService queues Bus + Metro searches and deletes after upload ack', () async {
+    SharedPreferences.setMockInitialValues({});
+    final svc = SearchAnalyticsService();
+
+    expect(
+      SearchAnalyticsService.resolveNearestLocationName(22.5850, 88.3426).toLowerCase(),
+      contains('howrah'),
+    );
+
+    await svc.recordSearch(
+      mode: 'bus_route',
+      from: 'Howrah Station',
+      to: 'Sector V',
+      resultsCount: 6,
+      autoFlush: false,
+    );
+    await svc.recordSearch(
+      mode: 'metro',
+      from: 'Howrah Maidan',
+      to: 'Esplanade',
+      resultsCount: 4,
+      autoFlush: false,
+    );
+
+    final pendingBefore = await svc.getPendingSearches();
+    expect(pendingBefore.length, 2);
+
+    // Failed upload retains local storage
+    final failedCount = await svc.flushQueue(uploader: (_, _) async => null);
+    expect(failedCount, 0);
+    expect((await svc.getPendingSearches()).length, 2);
+
+    // Confirmed upload deletes synced entries from local storage
+    final flushedCount = await svc.flushQueue(
+      uploader: (_, batch) async => batch.map((e) => e['local_id'].toString()).toList(),
+    );
+    expect(flushedCount, 2);
+    expect(await svc.getPendingSearches(), isEmpty);
   });
 }

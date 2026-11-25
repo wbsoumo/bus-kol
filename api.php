@@ -50,6 +50,65 @@ function get_db()
     return $conn;
 }
 
+function get_client_ip()
+{
+    $candidates = [
+        $_SERVER['HTTP_CF_CONNECTING_IP'] ?? '',
+        $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '',
+        $_SERVER['HTTP_X_REAL_IP'] ?? '',
+        $_SERVER['REMOTE_ADDR'] ?? ''
+    ];
+    foreach ($candidates as $raw) {
+        if (!$raw) {
+            continue;
+        }
+        $parts = explode(',', $raw);
+        foreach ($parts as $p) {
+            $ip = trim($p);
+            if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                return substr($ip, 0, 45);
+            }
+        }
+    }
+    return '';
+}
+
+function ensure_telemetry_schema($db)
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+
+    $col = @$db->query("SHOW COLUMNS FROM community_chat LIKE 'ip_address'");
+    if ($col && $col->num_rows === 0) {
+        @$db->query("ALTER TABLE community_chat ADD COLUMN ip_address VARCHAR(45) NULL, ADD COLUMN latitude DECIMAL(10,6) NULL, ADD COLUMN longitude DECIMAL(10,6) NULL, ADD COLUMN location_name VARCHAR(150) NULL");
+    }
+
+    @$db->query("
+        CREATE TABLE IF NOT EXISTS search_analytics (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            device_id VARCHAR(64) NOT NULL DEFAULT '',
+            search_mode VARCHAR(20) NOT NULL DEFAULT 'bus_route',
+            from_query VARCHAR(150) NOT NULL DEFAULT '',
+            to_query VARCHAR(150) NOT NULL DEFAULT '',
+            bus_no VARCHAR(60) NOT NULL DEFAULT '',
+            results_count INT NOT NULL DEFAULT 0,
+            latitude DECIMAL(10,6) NULL,
+            longitude DECIMAL(10,6) NULL,
+            location_name VARCHAR(150) NULL,
+            ip_address VARCHAR(45) NOT NULL DEFAULT '',
+            searched_at VARCHAR(40) NOT NULL DEFAULT '',
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_mode_route (search_mode, from_query(64), to_query(64)),
+            KEY idx_bus_no (bus_no),
+            KEY idx_ip (ip_address),
+            KEY idx_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+}
+
 function calculate_bus_fare($bus_type, $total_stops)
 {
     $stops = max(1, (int) $total_stops);
@@ -535,6 +594,7 @@ if ($route === 'chat/list' || $route === 'chat/messages') {
 
 if ($route === 'chat/post' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $db = get_db();
+    ensure_telemetry_schema($db);
     $raw = file_get_contents('php://input');
     $data = json_decode($raw, true) ?? [];
     $channel = trim($data['channel'] ?? 'general');
@@ -546,16 +606,78 @@ if ($route === 'chat/post' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $msg = trim($data['message'] ?? '');
     $route_ref = trim($data['route_ref'] ?? '');
     $status_tag = trim($data['status_tag'] ?? 'Normal');
+    $ip_address = get_client_ip();
+    $lat = (isset($data['lat']) && is_numeric($data['lat'])) ? (float) $data['lat'] : null;
+    $lng = (isset($data['lng']) && is_numeric($data['lng'])) ? (float) $data['lng'] : null;
+    $loc_name = substr(trim($data['location_name'] ?? ''), 0, 150);
 
     if ($msg) {
-        $stmt = $db->prepare("INSERT INTO community_chat (channel, user_name, route_ref, status_tag, message) VALUES (?, ?, ?, ?, ?)");
-        $stmt->bind_param('sssss', $channel, $user, $route_ref, $status_tag, $msg);
+        $stmt = $db->prepare("INSERT INTO community_chat (channel, user_name, route_ref, status_tag, message, ip_address, latitude, longitude, location_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param('ssssssdds', $channel, $user, $route_ref, $status_tag, $msg, $ip_address, $lat, $lng, $loc_name);
         $stmt->execute();
         $msg_id = $stmt->insert_id;
         echo json_encode(secure_encrypt(['success' => true, 'id' => $msg_id, 'user_name' => $user]));
         exit;
     }
     echo json_encode(secure_encrypt(['success' => false, 'error' => 'Message required']));
+    exit;
+}
+
+// -------------------------------------------------------------
+// 7B. BATCH SEARCH ANALYTICS (BUS + METRO TELEMETRY)
+// -------------------------------------------------------------
+if ($route === 'analytics/searches' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $db = get_db();
+    ensure_telemetry_schema($db);
+    $raw = file_get_contents('php://input');
+    $data = json_decode($raw, true) ?? [];
+    $device_id = substr(trim($data['device_id'] ?? ''), 0, 64);
+    $items = $data['searches'] ?? [];
+    if (!is_array($items)) {
+        $items = [];
+    }
+    $ip_address = get_client_ip();
+
+    $stmt = $db->prepare("INSERT INTO search_analytics (device_id, search_mode, from_query, to_query, bus_no, results_count, latitude, longitude, location_name, ip_address, searched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $acked_ids = [];
+    $inserted = 0;
+
+    foreach (array_slice($items, 0, 200) as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $local_id = strval($item['local_id'] ?? '');
+        $mode = substr(trim($item['mode'] ?? 'bus_route'), 0, 20);
+        $from_q = substr(trim($item['from'] ?? ''), 0, 150);
+        $to_q = substr(trim($item['to'] ?? ''), 0, 150);
+        $bus_no = substr(trim($item['bus_no'] ?? ''), 0, 60);
+        $res_cnt = intval($item['results_count'] ?? 0);
+        $lat = (isset($item['lat']) && is_numeric($item['lat'])) ? (float) $item['lat'] : null;
+        $lng = (isset($item['lng']) && is_numeric($item['lng'])) ? (float) $item['lng'] : null;
+        $loc_name = substr(trim($item['location_name'] ?? ''), 0, 150);
+        $searched_at = substr(trim($item['searched_at'] ?? ''), 0, 40);
+
+        if ($from_q === '' && $to_q === '' && $bus_no === '') {
+            if ($local_id !== '') {
+                $acked_ids[] = $local_id;
+            }
+            continue;
+        }
+
+        $stmt->bind_param('sssssiddsss', $device_id, $mode, $from_q, $to_q, $bus_no, $res_cnt, $lat, $lng, $loc_name, $ip_address, $searched_at);
+        if ($stmt->execute()) {
+            $inserted++;
+            if ($local_id !== '') {
+                $acked_ids[] = $local_id;
+            }
+        }
+    }
+
+    echo json_encode(secure_encrypt([
+        'success' => true,
+        'inserted' => $inserted,
+        'acked_ids' => $acked_ids
+    ]));
     exit;
 }
 

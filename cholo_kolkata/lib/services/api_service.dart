@@ -204,32 +204,72 @@ class ApiService {
     }
   }
 
-  /// 8. Post Community Chat Alert
+  /// 8. Post Community Chat Alert (with optional GPS telemetry; IP captured on server)
   Future<bool> postChatMessage({
     required String channel,
     required String userName,
     required String routeRef,
     required String statusTag,
     required String message,
+    double? lat,
+    double? lng,
+    String? locationName,
   }) async {
     try {
       final uri = Uri.parse('$baseUrl/api/chat/post');
+      final payload = <String, dynamic>{
+        'channel': channel,
+        'user_name': userName,
+        'route_ref': routeRef,
+        'status_tag': statusTag,
+        'message': message,
+      };
+      if (lat != null && lng != null) {
+        payload['lat'] = lat;
+        payload['lng'] = lng;
+      }
+      if (locationName != null && locationName.isNotEmpty) {
+        payload['location_name'] = locationName;
+      }
+
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'channel': channel,
-          'user_name': userName,
-          'route_ref': routeRef,
-          'status_tag': statusTag,
-          'message': message,
-        }),
+        body: json.encode(payload),
       ).timeout(const Duration(seconds: 10));
 
       return response.statusCode == 200;
     } catch (e) {
       debugPrint('Error posting chat message: $e');
       return false;
+    }
+  }
+
+  /// 8b. Batch Upload Queued Search Analytics (Bus + Metro)
+  Future<List<String>?> uploadSearchAnalyticsBatch({
+    required String deviceId,
+    required List<Map<String, dynamic>> searches,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/api/analytics/searches');
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'device_id': deviceId,
+          'searches': searches,
+        }),
+      ).timeout(const Duration(seconds: 12));
+
+      if (response.statusCode != 200) return null;
+      final wrapper = json.decode(response.body);
+      if (wrapper == null || wrapper['p'] == null) return null;
+      final decrypted = await _decryptPayload(wrapper['p']) as Map<String, dynamic>;
+      if (decrypted['success'] != true) return null;
+      final list = decrypted['acked_ids'] as List? ?? [];
+      return list.map((e) => e.toString()).toList();
+    } catch (_) {
+      return null;
     }
   }
 

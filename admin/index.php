@@ -384,11 +384,71 @@ if ($db) {
 }
 
 // Search and Pagination for Routes
+$active_tab = trim($_GET['tab'] ?? 'routes');
+if (!in_array($active_tab, ['routes', 'analytics', 'chat'])) {
+    $active_tab = 'routes';
+}
 $search_query = trim($_GET['q'] ?? '');
 $filter_type = trim($_GET['type'] ?? '');
 $page = max(1, intval($_GET['page'] ?? 1));
 $per_page = 25;
 $offset = ($page - 1) * $per_page;
+
+// Analytics & Chat Logs Data
+$analytics_summary = [
+    'total_searches' => 0,
+    'bus_searches' => 0,
+    'metro_searches' => 0,
+    'unique_devices' => 0,
+];
+$top_bus_corridors = [];
+$top_bus_numbers = [];
+$top_metro_corridors = [];
+$top_search_locations = [];
+$recent_searches_log = [];
+$chat_logs = [];
+
+if ($db && $is_authenticated) {
+    $tbl_chk = @$db->query("SHOW TABLES LIKE 'search_analytics'");
+    if ($tbl_chk && $tbl_chk->num_rows > 0) {
+        if ($r = @$db->query("SELECT COUNT(*) AS total, SUM(search_mode IN ('bus_route','bus_no')) AS bus_cnt, SUM(search_mode = 'metro') AS metro_cnt, COUNT(DISTINCT NULLIF(device_id,'')) AS dev_cnt FROM search_analytics")) {
+            $row = $r->fetch_assoc();
+            $analytics_summary['total_searches'] = intval($row['total'] ?? 0);
+            $analytics_summary['bus_searches'] = intval($row['bus_cnt'] ?? 0);
+            $analytics_summary['metro_searches'] = intval($row['metro_cnt'] ?? 0);
+            $analytics_summary['unique_devices'] = intval($row['dev_cnt'] ?? 0);
+        }
+        if ($active_tab === 'analytics') {
+            if ($r = @$db->query("SELECT from_query, to_query, COUNT(*) AS hits FROM search_analytics WHERE search_mode = 'bus_route' AND from_query != '' AND to_query != '' GROUP BY from_query, to_query ORDER BY hits DESC LIMIT 15")) {
+                while ($row = $r->fetch_assoc()) $top_bus_corridors[] = $row;
+            }
+            if ($r = @$db->query("SELECT bus_no, COUNT(*) AS hits FROM search_analytics WHERE search_mode = 'bus_no' AND bus_no != '' GROUP BY bus_no ORDER BY hits DESC LIMIT 15")) {
+                while ($row = $r->fetch_assoc()) $top_bus_numbers[] = $row;
+            }
+            if ($r = @$db->query("SELECT from_query, to_query, COUNT(*) AS hits FROM search_analytics WHERE search_mode = 'metro' AND from_query != '' AND to_query != '' GROUP BY from_query, to_query ORDER BY hits DESC LIMIT 15")) {
+                while ($row = $r->fetch_assoc()) $top_metro_corridors[] = $row;
+            }
+            if ($r = @$db->query("SELECT COALESCE(NULLIF(location_name,''), ip_address, 'Unknown') AS area, ip_address, COUNT(*) AS hits FROM search_analytics GROUP BY area, ip_address ORDER BY hits DESC LIMIT 15")) {
+                while ($row = $r->fetch_assoc()) $top_search_locations[] = $row;
+            }
+            if ($r = @$db->query("SELECT search_mode, from_query, to_query, bus_no, results_count, location_name, latitude, longitude, ip_address, searched_at, created_at FROM search_analytics ORDER BY id DESC LIMIT 40")) {
+                while ($row = $r->fetch_assoc()) $recent_searches_log[] = $row;
+            }
+        }
+    }
+
+    if ($active_tab === 'chat') {
+        $col_chk = @$db->query("SHOW COLUMNS FROM community_chat LIKE 'ip_address'");
+        if ($col_chk && $col_chk->num_rows > 0) {
+            $r = @$db->query("SELECT id, channel, user_name, route_ref, status_tag, message, ip_address, latitude, longitude, location_name, created_at FROM community_chat ORDER BY id DESC LIMIT 100");
+        } else {
+            $r = @$db->query("SELECT id, channel, user_name, route_ref, status_tag, message, '' AS ip_address, NULL AS latitude, NULL AS longitude, '' AS location_name, created_at FROM community_chat ORDER BY id DESC LIMIT 100");
+        }
+        if ($r) {
+            while ($row = $r->fetch_assoc()) $chat_logs[] = $row;
+        }
+    }
+}
 
 $routes_list = [];
 $total_matching_routes = 0;
@@ -608,6 +668,20 @@ function togglePass() {
             </div>
         </div>
 
+        <!-- Navigation Tabs -->
+        <div class="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200/80 shadow-sm">
+            <a href="/admin?tab=routes" class="px-4 py-2 rounded-xl text-xs font-extrabold transition <?= $active_tab === 'routes' ? 'royal-gradient text-white shadow' : 'text-slate-600 hover:bg-slate-100' ?>">
+                🚌 Bus Routes Directory
+            </a>
+            <a href="/admin?tab=analytics" class="px-4 py-2 rounded-xl text-xs font-extrabold transition <?= $active_tab === 'analytics' ? 'royal-gradient text-white shadow' : 'text-slate-600 hover:bg-slate-100' ?>">
+                📊 Search Analytics (<?= number_format($analytics_summary['total_searches']) ?>)
+            </a>
+            <a href="/admin?tab=chat" class="px-4 py-2 rounded-xl text-xs font-extrabold transition <?= $active_tab === 'chat' ? 'royal-gradient text-white shadow' : 'text-slate-600 hover:bg-slate-100' ?>">
+                💬 Chat IP & Location Logs
+            </a>
+        </div>
+
+        <?php if ($active_tab === 'routes'): ?>
         <!-- Action Toolbar -->
         <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
             <!-- Search & Filters -->
@@ -740,6 +814,169 @@ function togglePass() {
             </div>
             <?php endif; ?>
         </div>
+
+        <?php elseif ($active_tab === 'analytics'): ?>
+        <!-- SEARCH ANALYTICS VIEW -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-500 uppercase">Total Searches Logged</div>
+                <div class="text-2xl font-black text-slate-900 mt-1"><?= number_format($analytics_summary['total_searches']) ?></div>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-500 uppercase">Bus Searches</div>
+                <div class="text-2xl font-black text-blue-700 mt-1"><?= number_format($analytics_summary['bus_searches']) ?></div>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-500 uppercase">Metro Searches</div>
+                <div class="text-2xl font-black text-emerald-700 mt-1"><?= number_format($analytics_summary['metro_searches']) ?></div>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-500 uppercase">Unique Devices</div>
+                <div class="text-2xl font-black text-purple-700 mt-1"><?= number_format($analytics_summary['unique_devices']) ?></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="px-5 py-3.5 border-b border-slate-100 font-extrabold text-xs text-slate-900 uppercase tracking-wider">Top Searched Bus Stop Corridors</div>
+                <div class="divide-y divide-slate-100 text-xs">
+                    <?php if (empty($top_bus_corridors)): ?>
+                        <div class="p-6 text-center text-slate-400">No bus corridor searches uploaded yet.</div>
+                    <?php else: foreach ($top_bus_corridors as $row): ?>
+                        <div class="px-5 py-3 flex items-center justify-between">
+                            <span class="font-bold text-slate-800"><?= htmlspecialchars($row['from_query']) ?> ➔ <?= htmlspecialchars($row['to_query']) ?></span>
+                            <span class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-black"><?= number_format($row['hits']) ?></span>
+                        </div>
+                    <?php endforeach; endif; ?>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="px-5 py-3.5 border-b border-slate-100 font-extrabold text-xs text-slate-900 uppercase tracking-wider">Top Searched Bus Numbers</div>
+                <div class="divide-y divide-slate-100 text-xs">
+                    <?php if (empty($top_bus_numbers)): ?>
+                        <div class="p-6 text-center text-slate-400">No bus number searches uploaded yet.</div>
+                    <?php else: foreach ($top_bus_numbers as $row): ?>
+                        <div class="px-5 py-3 flex items-center justify-between">
+                            <span class="px-2 py-0.5 rounded bg-blue-100 text-blue-900 font-black"><?= htmlspecialchars($row['bus_no']) ?></span>
+                            <span class="px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 font-black"><?= number_format($row['hits']) ?></span>
+                        </div>
+                    <?php endforeach; endif; ?>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="px-5 py-3.5 border-b border-slate-100 font-extrabold text-xs text-slate-900 uppercase tracking-wider">Top Searched Metro Routes</div>
+                <div class="divide-y divide-slate-100 text-xs">
+                    <?php if (empty($top_metro_corridors)): ?>
+                        <div class="p-6 text-center text-slate-400">No metro searches uploaded yet.</div>
+                    <?php else: foreach ($top_metro_corridors as $row): ?>
+                        <div class="px-5 py-3 flex items-center justify-between">
+                            <span class="font-bold text-slate-800"><?= htmlspecialchars($row['from_query']) ?> ➔ <?= htmlspecialchars($row['to_query']) ?></span>
+                            <span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-black"><?= number_format($row['hits']) ?></span>
+                        </div>
+                    <?php endforeach; endif; ?>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="px-5 py-3.5 border-b border-slate-100 font-extrabold text-xs text-slate-900 uppercase tracking-wider">Top Search Locations / IPs</div>
+                <div class="divide-y divide-slate-100 text-xs">
+                    <?php if (empty($top_search_locations)): ?>
+                        <div class="p-6 text-center text-slate-400">No location telemetry recorded yet.</div>
+                    <?php else: foreach ($top_search_locations as $row): ?>
+                        <div class="px-5 py-3 flex items-center justify-between">
+                            <div>
+                                <div class="font-bold text-slate-800"><?= htmlspecialchars($row['area']) ?></div>
+                                <div class="text-[11px] font-mono text-slate-400"><?= htmlspecialchars($row['ip_address'] ?: '-') ?></div>
+                            </div>
+                            <span class="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-black"><?= number_format($row['hits']) ?></span>
+                        </div>
+                    <?php endforeach; endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="px-5 py-3.5 border-b border-slate-100 font-extrabold text-xs text-slate-900 uppercase tracking-wider">Recent Search Activity Feed</div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 text-slate-500 font-bold uppercase border-b border-slate-100">
+                        <tr>
+                            <th class="px-4 py-3">Mode</th>
+                            <th class="px-4 py-3">Query</th>
+                            <th class="px-4 py-3">Location / Coordinates</th>
+                            <th class="px-4 py-3">IP Address</th>
+                            <th class="px-4 py-3">Searched At</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <?php if (empty($recent_searches_log)): ?>
+                            <tr><td colspan="5" class="px-4 py-8 text-center text-slate-400">No searches synced yet.</td></tr>
+                        <?php else: foreach ($recent_searches_log as $s): ?>
+                            <tr>
+                                <td class="px-4 py-3 font-bold uppercase text-[11px]"><?= htmlspecialchars($s['search_mode']) ?></td>
+                                <td class="px-4 py-3 font-semibold text-slate-800">
+                                    <?= $s['search_mode'] === 'bus_no' ? htmlspecialchars($s['bus_no']) : htmlspecialchars($s['from_query'] . ' ➔ ' . $s['to_query']) ?>
+                                    <span class="text-[11px] text-slate-400 ml-1">(<?= intval($s['results_count']) ?>)</span>
+                                </td>
+                                <td class="px-4 py-3 text-slate-600">
+                                    <?= htmlspecialchars($s['location_name'] ?: '-') ?>
+                                    <?php if (!is_null($s['latitude']) && !is_null($s['longitude'])): ?>
+                                        <span class="text-[10px] font-mono text-slate-400 block"><?= number_format((float)$s['latitude'], 4) ?>, <?= number_format((float)$s['longitude'], 4) ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-4 py-3 font-mono text-[11px] text-slate-500"><?= htmlspecialchars($s['ip_address'] ?: '-') ?></td>
+                                <td class="px-4 py-3 text-[11px] text-slate-500"><?= htmlspecialchars($s['searched_at'] ?: $s['created_at']) ?></td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <?php elseif ($active_tab === 'chat'): ?>
+        <!-- CHAT IP & LOCATION LOGS VIEW -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100">
+                <h2 class="font-extrabold text-slate-900 text-sm">Community Chat Moderation Logs (IP & Location)</h2>
+                <p class="text-xs text-slate-500">Private administrator log of sender IP addresses and GPS coordinates.</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 text-slate-500 font-bold uppercase border-b border-slate-100">
+                        <tr>
+                            <th class="px-4 py-3">User</th>
+                            <th class="px-4 py-3">Channel</th>
+                            <th class="px-4 py-3">Message</th>
+                            <th class="px-4 py-3">Location</th>
+                            <th class="px-4 py-3">IP Address</th>
+                            <th class="px-4 py-3">Time</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <?php if (empty($chat_logs)): ?>
+                            <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">No chat messages found.</td></tr>
+                        <?php else: foreach ($chat_logs as $c): ?>
+                            <tr>
+                                <td class="px-4 py-3 font-bold text-slate-900"><?= htmlspecialchars($c['user_name']) ?></td>
+                                <td class="px-4 py-3 text-blue-700 font-semibold">#<?= htmlspecialchars($c['channel']) ?></td>
+                                <td class="px-4 py-3 text-slate-700 max-w-md"><?= htmlspecialchars($c['message']) ?></td>
+                                <td class="px-4 py-3 text-slate-600">
+                                    <?= htmlspecialchars($c['location_name'] ?: '-') ?>
+                                    <?php if (!is_null($c['latitude']) && !is_null($c['longitude'])): ?>
+                                        <span class="text-[10px] font-mono text-slate-400 block"><?= number_format((float)$c['latitude'], 4) ?>, <?= number_format((float)$c['longitude'], 4) ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-4 py-3 font-mono text-[11px] text-slate-500"><?= htmlspecialchars($c['ip_address'] ?: '-') ?></td>
+                                <td class="px-4 py-3 text-[11px] text-slate-500"><?= htmlspecialchars($c['created_at']) ?></td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
 
     </main>
 

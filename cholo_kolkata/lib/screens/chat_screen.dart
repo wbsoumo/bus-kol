@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import '../services/bus_data_service.dart';
+import '../services/search_analytics_service.dart';
 import '../services/settings_service.dart';
 import 'live_track_sheet.dart';
 
@@ -232,13 +233,17 @@ class _AnonymousChatSheetState extends State<AnonymousChatSheet> {
     });
     _scrollToBottom();
 
-    // Send silently to server in background
+    // Send silently to server in background (attach location if already permitted)
+    final loc = await SearchAnalyticsService().getSilentLocation();
     final success = await _api.postChatMessage(
       channel: _currentChannel,
       userName: _myPassengerId,
       routeRef: '',
       statusTag: 'Normal',
       message: text,
+      lat: loc?.lat,
+      lng: loc?.lng,
+      locationName: loc?.locationName,
     );
 
     if (mounted) {
