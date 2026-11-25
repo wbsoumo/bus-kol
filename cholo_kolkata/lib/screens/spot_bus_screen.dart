@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/bus_data_service.dart';
 import '../services/kolkata_stops.dart';
 import '../services/settings_service.dart';
 import '../models/models.dart';
@@ -168,18 +169,31 @@ class _SpotBusScreenState extends State<SpotBusScreen> {
   }
 
   void _onBusNoChanged(String val) async {
-    if (val.trim().isEmpty) {
+    final clean = val.trim();
+    if (clean.isEmpty) {
       setState(() {
         _busSuggestions = [];
         _showBusSuggestions = false;
       });
       return;
     }
-    final results = await _api.searchBusNumbers(val);
+    // 1. Instant 0ms local match (WIMT real-time search)
+    final localMatches = BusDataService().searchBusNumbers(clean);
     setState(() {
-      _busSuggestions = results;
-      _showBusSuggestions = results.isNotEmpty;
+      _busSuggestions = localMatches;
+      _showBusSuggestions = localMatches.isNotEmpty;
     });
+
+    // 2. Background server check
+    try {
+      final results = await _api.searchBusNumbers(clean);
+      if (mounted && _busNoCtrl.text.trim() == clean && results.isNotEmpty) {
+        setState(() {
+          _busSuggestions = results;
+          _showBusSuggestions = true;
+        });
+      }
+    } catch (_) {}
   }
 
   void _searchByBusNumber([String? term]) {

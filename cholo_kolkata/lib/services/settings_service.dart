@@ -32,6 +32,17 @@ class SettingsService extends ChangeNotifier {
 
   static const List<AppThemeOption> themes = [
     AppThemeOption(
+      id: 'blue',
+      name: 'Metro Blue',
+      subtitle: 'Line 1 & AC Electric bus fleet',
+      icon: '🚇',
+      primary: Color(0xFF1565C0),
+      secondary: Color(0xFF1E88E5),
+      lightBg: Color(0xFFE3F2FD),
+      badgeBg: Color(0xFFBBDEFB),
+      badgeText: Color(0xFF0D47A1),
+    ),
+    AppThemeOption(
       id: 'orange',
       name: 'Sunset Orange',
       subtitle: 'Where Is My Train & Kolkata transit vibe',
@@ -54,17 +65,6 @@ class SettingsService extends ChangeNotifier {
       badgeText: Color(0xFF004D40),
     ),
     AppThemeOption(
-      id: 'blue',
-      name: 'Metro Blue',
-      subtitle: 'Line 1 & AC Electric bus fleet',
-      icon: '🚇',
-      primary: Color(0xFF1565C0),
-      secondary: Color(0xFF1E88E5),
-      lightBg: Color(0xFFE3F2FD),
-      badgeBg: Color(0xFFBBDEFB),
-      badgeText: Color(0xFF0D47A1),
-    ),
-    AppThemeOption(
       id: 'dark',
       name: 'Midnight Dark',
       subtitle: 'High contrast transit theme',
@@ -80,14 +80,18 @@ class SettingsService extends ChangeNotifier {
   late SharedPreferences _prefs;
   bool _isInitialized = false;
 
-  String _currentThemeId = 'orange'; // Default: Orange
+  bool _isFirstTimeLaunch = true;
+  String _currentThemeId = 'blue'; // Default: Metro Blue
+  String _selectedLanguage = 'en'; // Default: English
   bool _notificationsEnabled = true;
   bool _vibrationEnabled = true;
   String _lastFromStop = 'Howrah Station';
   String _lastToStop = 'Sector V';
   String _lastBusNo = '215A';
 
+  bool get isFirstTimeLaunch => _isFirstTimeLaunch;
   String get currentThemeId => _currentThemeId;
+  String get selectedLanguage => _selectedLanguage;
   AppThemeOption get currentTheme =>
       themes.firstWhere((t) => t.id == _currentThemeId, orElse: () => themes.first);
   bool get notificationsEnabled => _notificationsEnabled;
@@ -100,7 +104,9 @@ class SettingsService extends ChangeNotifier {
     if (_isInitialized) return;
     _prefs = await SharedPreferences.getInstance();
 
-    _currentThemeId = _prefs.getString('app_theme_id') ?? 'orange';
+    _isFirstTimeLaunch = _prefs.getBool('is_first_time_launch') ?? true;
+    _currentThemeId = _prefs.getString('app_theme_id') ?? 'blue';
+    _selectedLanguage = _prefs.getString('app_language') ?? 'en';
     _notificationsEnabled = _prefs.getBool('pref_notifications_enabled') ?? true;
     _vibrationEnabled = _prefs.getBool('pref_vibration_enabled') ?? true;
     _lastFromStop = _prefs.getString('last_from_stop') ?? 'Howrah Station';
@@ -111,9 +117,25 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> completeOnboarding({required String themeId, required String language}) async {
+    _isFirstTimeLaunch = false;
+    _currentThemeId = themeId;
+    _selectedLanguage = language;
+    await _prefs.setBool('is_first_time_launch', false);
+    await _prefs.setString('app_theme_id', themeId);
+    await _prefs.setString('app_language', language);
+    notifyListeners();
+  }
+
   Future<void> setTheme(String themeId) async {
     _currentThemeId = themeId;
     await _prefs.setString('app_theme_id', themeId);
+    notifyListeners();
+  }
+
+  Future<void> setLanguage(String language) async {
+    _selectedLanguage = language;
+    await _prefs.setString('app_language', language);
     notifyListeners();
   }
 
@@ -158,5 +180,10 @@ class SettingsService extends ChangeNotifier {
     _lastBusNo = '215A';
     notifyListeners();
   }
-}
 
+  Future<void> resetOnboarding() async {
+    _isFirstTimeLaunch = true;
+    await _prefs.setBool('is_first_time_launch', true);
+    notifyListeners();
+  }
+}

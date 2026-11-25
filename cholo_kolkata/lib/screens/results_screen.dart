@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../services/bus_data_service.dart';
 import '../services/bus_photo_service.dart';
+import '../services/settings_service.dart';
 import '../widgets/bus_photo_viewer.dart';
 import 'live_track_sheet.dart';
 
@@ -40,23 +42,42 @@ class _ResultsScreenState extends State<ResultsScreen> {
   }
 
   void _performSearch() async {
-    setState(() {
-      _isLoading = true;
-      _error = '';
-    });
+    // 1. Instant 0ms In-Memory Preload
+    final localDirect = BusDataService().searchRoutes(_currentFrom, _currentTo);
+    if (localDirect.isNotEmpty) {
+      setState(() {
+        _directRoutes = localDirect;
+        _isLoading = false;
+        _error = '';
+      });
+    } else {
+      setState(() {
+        _isLoading = true;
+        _error = '';
+      });
+    }
 
+    // 2. Silent Network Sync
     try {
       final res = await _api.searchRoutes(_currentFrom, _currentTo);
-      setState(() {
-        _directRoutes = res['direct'] as List<BusRoute>;
-        _transferRoutes = res['transfers'] as List<TransferRoute>;
-        _isLoading = false;
-      });
+      final netDirect = res['direct'] as List<BusRoute>;
+      final netTransfers = res['transfers'] as List<TransferRoute>;
+      if (mounted) {
+        setState(() {
+          if (netDirect.isNotEmpty || _directRoutes.isEmpty) {
+            _directRoutes = netDirect;
+          }
+          _transferRoutes = netTransfers;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _error = 'Could not load buses. Please verify your connection.';
-        _isLoading = false;
-      });
+      if (mounted && _directRoutes.isEmpty) {
+        setState(() {
+          _error = 'Could not load buses. Please verify your connection.';
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -113,7 +134,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(color: const Color(0xFF00695C), borderRadius: BorderRadius.circular(6)),
+                        decoration: BoxDecoration(color: SettingsService().currentTheme.primary, borderRadius: BorderRadius.circular(6)),
                         child: Text(r.routeNo, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
                       ),
                       const SizedBox(width: 8),
@@ -148,7 +169,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00695C),
+                    backgroundColor: SettingsService().currentTheme.primary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onPressed: () => Navigator.pop(ctx),
@@ -194,7 +215,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFEEF1F4),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF00695C),
+        backgroundColor: SettingsService().currentTheme.primary,
         elevation: 2,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -244,13 +265,13 @@ class _ResultsScreenState extends State<ResultsScreen> {
           // Main list
           Expanded(
             child: _isLoading
-                ? const Center(
+                ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        CircularProgressIndicator(color: Color(0xFF00695C)),
-                        SizedBox(height: 12),
-                        Text('Finding Connecting Buses in Kolkata...', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                        CircularProgressIndicator(color: SettingsService().currentTheme.primary),
+                        const SizedBox(height: 12),
+                        const Text('Finding Connecting Buses in Kolkata...', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   )
@@ -320,7 +341,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFF00695C) : const Color(0xFFF0F4F8),
+          color: active ? SettingsService().currentTheme.primary : const Color(0xFFF0F4F8),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
@@ -367,7 +388,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00695C),
+                      color: SettingsService().currentTheme.primary,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -397,19 +418,19 @@ class _ResultsScreenState extends State<ResultsScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE0F2F1),
+                        color: SettingsService().currentTheme.lightBg,
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFF80CBC4)),
+                        border: Border.all(color: SettingsService().currentTheme.badgeBg),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.info_outline, size: 14, color: Color(0xFF00695C)),
+                          Icon(Icons.info_outline, size: 14, color: SettingsService().currentTheme.primary),
                           const SizedBox(width: 3),
-                          const Text('INFO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF00695C))),
+                          Text('INFO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: SettingsService().currentTheme.primary)),
                           if (BusPhotoService.hasKnownPhotos(r.routeNo)) ...[
                             const SizedBox(width: 3),
-                            const Icon(Icons.photo_camera_rounded, size: 11, color: Color(0xFF00695C)),
+                            Icon(Icons.photo_camera_rounded, size: 11, color: SettingsService().currentTheme.primary),
                           ],
                         ],
                       ),
@@ -455,11 +476,11 @@ class _ResultsScreenState extends State<ResultsScreen> {
                     r.stopsBetween != null ? '${r.stopsBetween} stops between' : '${r.totalStops} total stops',
                     style: TextStyle(color: Colors.grey[600], fontSize: 11, fontWeight: FontWeight.w600),
                   ),
-                  const Row(
+                  Row(
                     children: [
-                      Text('LIVE STATUS', style: TextStyle(color: Color(0xFF00695C), fontWeight: FontWeight.bold, fontSize: 11)),
-                      SizedBox(width: 4),
-                      Icon(Icons.arrow_forward_ios, size: 10, color: Color(0xFF00695C)),
+                      Text('LIVE STATUS', style: TextStyle(color: SettingsService().currentTheme.primary, fontWeight: FontWeight.bold, fontSize: 11)),
+                      const SizedBox(width: 4),
+                      Icon(Icons.arrow_forward_ios, size: 10, color: SettingsService().currentTheme.primary),
                     ],
                   ),
                 ],

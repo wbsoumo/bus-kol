@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
+import '../services/settings_service.dart';
 
 class MetroResultScreen extends StatefulWidget {
   final MetroPlan plan;
@@ -39,11 +40,11 @@ class _MetroResultScreenState extends State<MetroResultScreen> {
             ),
             Text(
               '${plan.fromStation} ➔ ${plan.toStation}',
-              style: const TextStyle(fontSize: 12, color: Color(0xFFE0F2F1)),
+              style: TextStyle(fontSize: 12, color: SettingsService().currentTheme.lightBg),
             ),
           ],
         ),
-        backgroundColor: const Color(0xFF00695C),
+        backgroundColor: SettingsService().currentTheme.primary,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -239,11 +240,11 @@ class _MetroResultScreenState extends State<MetroResultScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.info_outline, size: 16, color: Color(0xFF00695C)),
-                        SizedBox(width: 6),
-                        Text('SMART CARD & TOKEN RULES', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF00695C))),
+                        Icon(Icons.info_outline, size: 16, color: SettingsService().currentTheme.primary),
+                        const SizedBox(width: 6),
+                        Text('SMART CARD & TOKEN RULES', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: SettingsService().currentTheme.primary)),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -266,7 +267,7 @@ class _MetroResultScreenState extends State<MetroResultScreen> {
   Widget _buildStatItem(IconData icon, String val, String label) {
     return Column(
       children: [
-        Icon(icon, size: 18, color: const Color(0xFF00695C)),
+        Icon(icon, size: 18, color: SettingsService().currentTheme.primary),
         const SizedBox(height: 4),
         Text(val, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF1E293B))),
         Text(label, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey)),

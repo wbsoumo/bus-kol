@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../services/settings_service.dart';
 
 class AnonymousChatSheet extends StatefulWidget {
   const AnonymousChatSheet({super.key});
@@ -109,25 +110,25 @@ class _AnonymousChatSheetState extends State<AnonymousChatSheet> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE0F2F1),
+                  decoration: BoxDecoration(
+                    color: SettingsService().currentTheme.lightBg,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.forum, color: Color(0xFF00695C), size: 20),
+                  child: Icon(Icons.forum, color: SettingsService().currentTheme.primary, size: 20),
                 ),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          Text('Anonymous Commuter Chat', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                          SizedBox(width: 6),
-                          Icon(Icons.shield_outlined, size: 14, color: Color(0xFF00695C)),
+                          const Text('Anonymous Commuter Chat', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                          const SizedBox(width: 6),
+                          Icon(Icons.shield_outlined, size: 14, color: SettingsService().currentTheme.primary),
                         ],
                       ),
-                      Text('No login required • Real-time Kolkata traffic & bus feed', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      const Text('No login required • Real-time Kolkata traffic & bus feed', style: TextStyle(color: Colors.grey, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -158,7 +159,7 @@ class _AnonymousChatSheetState extends State<AnonymousChatSheet> {
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: active ? const Color(0xFF00695C) : const Color(0xFFF1F5F9),
+                        color: active ? SettingsService().currentTheme.primary : const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -181,7 +182,7 @@ class _AnonymousChatSheetState extends State<AnonymousChatSheet> {
           // Messages Feed
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF00695C)))
+                ? Center(child: CircularProgressIndicator(color: SettingsService().currentTheme.primary))
                 : _messages.isEmpty
                     ? Center(
                         child: Column(
@@ -232,8 +233,8 @@ class _AnonymousChatSheetState extends State<AnonymousChatSheet> {
                                         children: [
                                           CircleAvatar(
                                             radius: 10,
-                                            backgroundColor: const Color(0xFF00695C).withAlpha(30),
-                                            child: const Icon(Icons.person, size: 12, color: Color(0xFF00695C)),
+                                            backgroundColor: SettingsService().currentTheme.primary.withAlpha(30),
+                                            child: Icon(Icons.person, size: 12, color: SettingsService().currentTheme.primary),
                                           ),
                                           const SizedBox(width: 6),
                                           Text(m.userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
@@ -341,9 +342,9 @@ class _AnonymousChatSheetState extends State<AnonymousChatSheet> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: isSel ? const Color(0xFF00695C) : Colors.white,
+                              color: isSel ? SettingsService().currentTheme.primary : Colors.white,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: isSel ? const Color(0xFF00695C) : Colors.grey[300]!),
+                              border: Border.all(color: isSel ? SettingsService().currentTheme.primary : Colors.grey[300]!),
                             ),
                             child: Text(
                               st['label'],
@@ -370,7 +371,7 @@ class _AnonymousChatSheetState extends State<AnonymousChatSheet> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: const Color(0xFF00695C)),
+                          border: Border.all(color: SettingsService().currentTheme.primary),
                         ),
                         child: TextField(
                           controller: _msgCtrl,
@@ -392,8 +393,8 @@ class _AnonymousChatSheetState extends State<AnonymousChatSheet> {
                       child: Container(
                         width: 38,
                         height: 38,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF00695C),
+                        decoration: BoxDecoration(
+                          color: SettingsService().currentTheme.primary,
                           shape: BoxShape.circle,
                         ),
                         child: _isPosting

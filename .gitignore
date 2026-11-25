@@ -31,3 +31,6 @@ kolkata_bus.db
 !.env
 !.env.example
 !config.py
+
+*.apk
+test_*.png

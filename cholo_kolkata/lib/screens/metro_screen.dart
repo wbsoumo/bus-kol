@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import '../services/metro_service.dart';
+import '../services/settings_service.dart';
 import 'metro_result_screen.dart';
 import 'drawer_pages.dart';
 
@@ -102,13 +103,13 @@ class _MetroScreenState extends State<MetroScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.alt_route, color: Color(0xFF00695C), size: 18),
-                    SizedBox(width: 8),
+                    Icon(Icons.alt_route, color: SettingsService().currentTheme.primary, size: 18),
+                    const SizedBox(width: 8),
                     Text(
                       'STATION TO STATION ROUTE PLANNER',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: Color(0xFF00695C), letterSpacing: 0.5),
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: SettingsService().currentTheme.primary, letterSpacing: 0.5),
                     ),
                   ],
                 ),
@@ -124,7 +125,7 @@ class _MetroScreenState extends State<MetroScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.trip_origin, size: 16, color: Color(0xFF00897B)),
+                      Icon(Icons.trip_origin, size: 16, color: SettingsService().currentTheme.primary),
                       const SizedBox(width: 10),
                       Expanded(
                         child: DropdownButtonHideUnderline(
@@ -158,16 +159,16 @@ class _MetroScreenState extends State<MetroScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE0F2F1),
+                          color: SettingsService().currentTheme.lightBg,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFF80CBC4)),
+                          border: Border.all(color: SettingsService().currentTheme.badgeBg),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.swap_vert, size: 16, color: Color(0xFF00695C)),
-                            SizedBox(width: 4),
-                            Text('Swap Direction', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF00695C))),
+                            Icon(Icons.swap_vert, size: 16, color: SettingsService().currentTheme.primary),
+                            const SizedBox(width: 4),
+                            Text('Swap Direction', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: SettingsService().currentTheme.primary)),
                           ],
                         ),
                       ),
@@ -313,10 +314,10 @@ class _MetroScreenState extends State<MetroScreen> {
               border: Border.all(color: const Color(0xFFE2E8F0)),
               boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 4)],
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.menu_book, color: Color(0xFF00695C), size: 24),
-                SizedBox(width: 12),
+                Icon(Icons.menu_book, color: SettingsService().currentTheme.primary, size: 24),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/bus_photo_service.dart';
+import '../services/settings_service.dart';
 
 class BusPhotoGallery extends StatefulWidget {
   final String routeNo;
@@ -222,9 +223,9 @@ class _BusPhotoGalleryState extends State<BusPhotoGallery> {
       height: widget.height,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: const Color(0xFFE0F2F1),
+        color: SettingsService().currentTheme.lightBg,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFB2DFDB)),
+        border: Border.all(color: SettingsService().currentTheme.badgeBg),
       ),
       child: Stack(
         alignment: Alignment.center,
@@ -235,7 +236,7 @@ class _BusPhotoGalleryState extends State<BusPhotoGallery> {
               Icon(
                 widget.isAc ? Icons.airport_shuttle : Icons.directions_bus,
                 size: 48,
-                color: const Color(0xFF00695C),
+                color: SettingsService().currentTheme.primary,
               ),
               const SizedBox(height: 6),
               Text(

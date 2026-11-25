@@ -4,15 +4,18 @@ import 'screens/metro_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/drawer_pages.dart';
 import 'screens/settings_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/live_track_sheet.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'services/settings_service.dart';
+import 'services/bus_data_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService().init();
   await SettingsService().init();
+  await BusDataService().init();
   runApp(const CholoKolkataApp());
 }
 
@@ -43,7 +46,9 @@ class CholoKolkataApp extends StatelessWidget {
             fontFamily: 'Roboto',
             useMaterial3: true,
           ),
-          home: const MainHomeScreen(),
+          home: settings.isFirstTimeLaunch
+              ? const OnboardingScreen()
+              : const MainHomeScreen(),
         );
       },
     );

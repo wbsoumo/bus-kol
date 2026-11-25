@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/settings_service.dart';
 import 'results_screen.dart';
 
 // ==========================================
@@ -60,7 +61,7 @@ class _SavedRoutesPageState extends State<SavedRoutesPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF00695C),
+        backgroundColor: SettingsService().currentTheme.primary,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -102,7 +103,7 @@ class _SavedRoutesPageState extends State<SavedRoutesPage> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF00695C),
+                                    color: SettingsService().currentTheme.primary,
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(r['route_no'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
@@ -147,7 +148,7 @@ class _SavedRoutesPageState extends State<SavedRoutesPage> {
                             Text('${r['stops_count']} Stops • Runs Daily', style: TextStyle(color: Colors.grey[600], fontSize: 11)),
                             ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF00695C),
+                                backgroundColor: SettingsService().currentTheme.primary,
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                 visualDensity: VisualDensity.compact,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
@@ -200,7 +201,7 @@ class _TripHistoryPageState extends State<TripHistoryPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF00695C),
+        backgroundColor: SettingsService().currentTheme.primary,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -249,7 +250,7 @@ class _TripHistoryPageState extends State<TripHistoryPage> {
                         color: isBus ? const Color(0xFFE0F2F1) : const Color(0xFFEDE7F6),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(isBus ? Icons.directions_bus : Icons.subway, color: isBus ? const Color(0xFF00695C) : const Color(0xFF5E35B1), size: 20),
+                      child: Icon(isBus ? Icons.directions_bus : Icons.subway, color: isBus ? SettingsService().currentTheme.primary : const Color(0xFF5E35B1), size: 20),
                     ),
                     title: Text('${t['from']} ➔ ${t['to']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     subtitle: Column(
@@ -287,7 +288,7 @@ class FareChartPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF00695C),
+        backgroundColor: SettingsService().currentTheme.primary,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -311,7 +312,7 @@ class FareChartPage extends StatelessWidget {
               ['Stage 5', '16 - 20 km', '₹20'],
               ['Stage 6', '20+ km', '₹25'],
             ],
-            color: const Color(0xFF00695C),
+            color: SettingsService().currentTheme.primary,
           ),
           const SizedBox(height: 14),
           _buildFareTable(
@@ -466,7 +467,7 @@ class _OtaSyncPageState extends State<OtaSyncPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF00695C),
+        backgroundColor: SettingsService().currentTheme.primary,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -492,7 +493,7 @@ class _OtaSyncPageState extends State<OtaSyncPage> {
                         color: Color(0xFFE0F2F1),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(_isChecking ? Icons.sync : Icons.cloud_done, size: 32, color: const Color(0xFF00695C)),
+                      child: Icon(_isChecking ? Icons.sync : Icons.cloud_done, size: 32, color: SettingsService().currentTheme.primary),
                     ),
                     const SizedBox(height: 12),
                     const Text('Over-The-Air Route Sync', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
@@ -510,13 +511,13 @@ class _OtaSyncPageState extends State<OtaSyncPage> {
                     _buildSyncStat('Payload Encryption', 'AES-256-GCM Secure'),
                     _buildSyncStat('Last Synchronization', _lastSync),
                     const SizedBox(height: 16),
-                    Text(_status, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF00695C))),
+                    Text(_status, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: SettingsService().currentTheme.primary)),
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00695C),
+                          backgroundColor: SettingsService().currentTheme.primary,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
@@ -565,14 +566,20 @@ class LanguagePage extends StatefulWidget {
 }
 
 class _LanguagePageState extends State<LanguagePage> {
-  String _selected = 'en';
+  late String _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = SettingsService().selectedLanguage;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF00695C),
+        backgroundColor: SettingsService().currentTheme.primary,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -595,7 +602,7 @@ class _LanguagePageState extends State<LanguagePage> {
                     subtitle: const Text('All routes, stops and announcements in English', style: TextStyle(fontSize: 11)),
                     value: 'en',
                     groupValue: _selected,
-                    activeColor: const Color(0xFF00695C),
+                    activeColor: SettingsService().currentTheme.primary,
                     onChanged: (val) => setState(() => _selected = val!),
                   ),
                   const Divider(height: 1),
@@ -604,7 +611,7 @@ class _LanguagePageState extends State<LanguagePage> {
                     subtitle: const Text('চলো কলকাতা • সমস্ত বাস ও মেট্রো রুটের বিবরণ বাংলায়', style: TextStyle(fontSize: 11)),
                     value: 'bn',
                     groupValue: _selected,
-                    activeColor: const Color(0xFF00695C),
+                    activeColor: SettingsService().currentTheme.primary,
                     onChanged: (val) => setState(() => _selected = val!),
                   ),
                 ],
@@ -615,11 +622,12 @@ class _LanguagePageState extends State<LanguagePage> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00695C),
+                  backgroundColor: SettingsService().currentTheme.primary,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () {
+                  SettingsService().setLanguage(_selected);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(_selected == 'bn' ? 'ভাষা বাংলা নির্বাচন করা হয়েছে' : 'Language set to English')),
                   );
@@ -646,7 +654,7 @@ class PrivacyPolicyPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF00695C),
+        backgroundColor: SettingsService().currentTheme.primary,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -663,11 +671,11 @@ class PrivacyPolicyPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.shield, color: Color(0xFF00695C), size: 24),
-                      SizedBox(width: 8),
-                      Text('256-Bit Encrypted Architecture', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                      Icon(Icons.shield, color: SettingsService().currentTheme.primary, size: 24),
+                      const SizedBox(width: 8),
+                      const Text('256-Bit Encrypted Architecture', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -687,17 +695,17 @@ class PrivacyPolicyPage extends StatelessWidget {
           const SizedBox(height: 16),
           Card(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            color: const Color(0xFFE0F2F1),
-            child: const Padding(
-              padding: EdgeInsets.all(14),
+            color: SettingsService().currentTheme.lightBg,
+            child: Padding(
+              padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
-                  Icon(Icons.favorite, color: Color(0xFF00695C), size: 20),
-                  SizedBox(width: 10),
+                  Icon(Icons.favorite, color: SettingsService().currentTheme.primary, size: 20),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'Made with love for Kolkata commuters • Dedicated to smooth daily transit across West Bengal.',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF004D40)),
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: SettingsService().currentTheme.badgeText),
                     ),
                   ),
                 ],
@@ -818,7 +826,7 @@ class MetroDirectoryPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF00695C),
+        backgroundColor: SettingsService().currentTheme.primary,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -834,18 +842,18 @@ class MetroDirectoryPage extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFE0F2F1),
+              color: SettingsService().currentTheme.lightBg,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF80CBC4)),
+              border: Border.all(color: SettingsService().currentTheme.badgeBg),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.subway, color: Color(0xFF00695C), size: 24),
-                SizedBox(width: 10),
+                Icon(Icons.subway, color: SettingsService().currentTheme.primary, size: 24),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Official Kolkata Metro Rail Corporation (KMRC) Network & Timings Directory',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF004D40)),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: SettingsService().currentTheme.badgeText),
                   ),
                 ),
               ],

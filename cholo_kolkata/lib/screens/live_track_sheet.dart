@@ -5,8 +5,10 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
+import '../services/bus_data_service.dart';
 import '../services/kolkata_geo.dart';
 import '../services/notification_service.dart';
+import '../services/settings_service.dart';
 import '../widgets/bus_photo_viewer.dart';
 
 class LiveTrackScreen extends StatefulWidget {
@@ -37,6 +39,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
   final NotificationService _notifications = NotificationService();
   final ScrollController _scrollController = ScrollController();
   final MapController _mapController = MapController();
+  AppThemeOption get theme => SettingsService().currentTheme;
 
   bool _isLoading = true;
   String _error = '';
@@ -61,9 +64,48 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
   @override
   void initState() {
     super.initState();
+    _preloadLocalDetails();
     _fetchDetails();
     _fetchLiveBuses();
     _liveFetchTimer = Timer.periodic(const Duration(seconds: 10), (_) => _fetchLiveBuses());
+  }
+
+  void _preloadLocalDetails() {
+    final localData = BusDataService().getRouteDetails(
+      widget.routeNo,
+      from: widget.initialFrom,
+      to: widget.initialTo,
+      busType: widget.busType,
+    );
+    if (localData != null) {
+      _routeData = localData['route'];
+      _stops = (localData['stops'] as List? ?? []);
+      _isLoading = false;
+      _error = '';
+      _updateIndices();
+    }
+  }
+
+  void _updateIndices() {
+    _fromIdx = 0;
+    _toIdx = _stops.isNotEmpty ? _stops.length - 1 : 0;
+
+    if (widget.initialFrom.isNotEmpty) {
+      final fIdx = _stops.indexWhere((s) =>
+          s['stop_name'].toString().toLowerCase().contains(widget.initialFrom.toLowerCase()));
+      if (fIdx != -1) _fromIdx = fIdx;
+    }
+    if (widget.initialTo.isNotEmpty) {
+      final tIdx = _stops.indexWhere((s) =>
+          s['stop_name'].toString().toLowerCase().contains(widget.initialTo.toLowerCase()));
+      if (tIdx != -1) _toIdx = tIdx;
+    }
+
+    if (_fromIdx > _toIdx) {
+      final temp = _fromIdx;
+      _fromIdx = _toIdx;
+      _toIdx = temp;
+    }
   }
 
   @override
@@ -98,33 +140,19 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
       final data = await _api.getRouteDetails(widget.routeId);
       if (!mounted) return;
 
-      setState(() {
-        _routeData = data['route'];
-        _stops = (data['stops'] as List? ?? data['route']?['stops'] as List? ?? []);
-        _isLoading = false;
-
-        _fromIdx = 0;
-        _toIdx = _stops.isNotEmpty ? _stops.length - 1 : 0;
-
-        if (widget.initialFrom.isNotEmpty) {
-          final fIdx = _stops.indexWhere((s) =>
-              s['stop_name'].toString().toLowerCase().contains(widget.initialFrom.toLowerCase()));
-          if (fIdx != -1) _fromIdx = fIdx;
-        }
-        if (widget.initialTo.isNotEmpty) {
-          final tIdx = _stops.indexWhere((s) =>
-              s['stop_name'].toString().toLowerCase().contains(widget.initialTo.toLowerCase()));
-          if (tIdx != -1) _toIdx = tIdx;
-        }
-
-        if (_fromIdx > _toIdx) {
-          final temp = _fromIdx;
-          _fromIdx = _toIdx;
-          _toIdx = temp;
-        }
-      });
+      final netStops = (data['stops'] as List? ?? data['route']?['stops'] as List? ?? []);
+      if (netStops.isNotEmpty) {
+        setState(() {
+          _routeData = data['route'] ?? _routeData;
+          _stops = netStops;
+          _isLoading = false;
+          _error = '';
+          _updateIndices();
+        });
+      }
     } catch (e) {
-      if (mounted) {
+      // If we already have stops loaded from local BusDataService, never show error
+      if (mounted && _stops.isEmpty) {
         setState(() {
           _error = 'Could not load stop timeline';
           _isLoading = false;
@@ -172,9 +200,10 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
     });
 
     if (mounted) {
+      final theme = SettingsService().currentTheme;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: const Color(0xFF00695C),
+          backgroundColor: theme.primary,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           content: const Row(
@@ -392,7 +421,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: const Color(0xFF00695C), borderRadius: BorderRadius.circular(6)),
+                    decoration: BoxDecoration(color: SettingsService().currentTheme.primary, borderRadius: BorderRadius.circular(6)),
                     child: Text(widget.routeNo, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
                   ),
                   const SizedBox(width: 8),
@@ -426,7 +455,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00695C), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+              style: ElevatedButton.styleFrom(backgroundColor: SettingsService().currentTheme.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
               onPressed: () => Navigator.pop(context),
               child: const Text('DONE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
@@ -459,10 +488,12 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
     final originTitle = activeStops.isNotEmpty ? activeStops.first['stop_name'] : widget.initialFrom;
     final destTitle = activeStops.isNotEmpty ? activeStops.last['stop_name'] : widget.initialTo;
 
+    final theme = SettingsService().currentTheme;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF00695C),
+        backgroundColor: theme.primary,
         elevation: 2,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -481,8 +512,8 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
                   ),
                   child: Text(
                     widget.routeNo,
-                    style: const TextStyle(
-                      color: Color(0xFF00695C),
+                    style: TextStyle(
+                      color: theme.primary,
                       fontWeight: FontWeight.w900,
                       fontSize: 13,
                     ),
@@ -617,7 +648,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
           // Main Content: Rail Track Timeline or OpenStreetMap
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF00695C)))
+                ? Center(child: CircularProgressIndicator(color: theme.primary))
                 : _error.isNotEmpty
                     ? Center(child: Text(_error))
                     : _isMapView
@@ -645,11 +676,11 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
               gradient: _isInsideBus
-                  ? const LinearGradient(colors: [Color(0xFF004D40), Color(0xFF00695C)])
+                  ? LinearGradient(colors: [theme.secondary, theme.primary])
                   : LinearGradient(colors: [Colors.grey.shade50, Colors.grey.shade100]),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: _isInsideBus ? const Color(0xFF00796B) : Colors.grey.shade300,
+                color: _isInsideBus ? theme.primary : Colors.grey.shade300,
                 width: 1.5,
               ),
             ),
@@ -658,12 +689,12 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: _isInsideBus ? Colors.white.withAlpha(50) : const Color(0xFFE0F2F1),
+                    color: _isInsideBus ? Colors.white.withAlpha(50) : theme.lightBg,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.directions_bus_rounded,
-                    color: _isInsideBus ? Colors.white : const Color(0xFF00695C),
+                    color: _isInsideBus ? Colors.white : theme.primary,
                     size: 24,
                   ),
                 ),
@@ -780,7 +811,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
                       Text(
                         '${(idx * 1.3).toStringAsFixed(1)} km',
                         style: TextStyle(
-                          color: isUserBusHere ? const Color(0xFF00695C) : Colors.grey[500],
+                          color: isUserBusHere ? theme.primary : Colors.grey[500],
                           fontSize: 11,
                           fontWeight: isUserBusHere ? FontWeight.bold : FontWeight.normal,
                         ),
@@ -806,7 +837,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
                         bottom: idx == activeStops.length - 1 ? 26 : 0,
                         child: Container(
                           width: inJourney ? 4 : 2,
-                          color: inJourney ? const Color(0xFF00695C) : Colors.grey[300],
+                          color: inJourney ? theme.primary : Colors.grey[300],
                         ),
                       ),
                       // Stop node dot
@@ -819,11 +850,11 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
                               : isEnd
                                   ? const Color(0xFFD32F2F)
                                   : inJourney
-                                      ? const Color(0xFF00695C)
+                                      ? theme.primary
                                       : Colors.white,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: inJourney ? const Color(0xFF00695C) : Colors.grey[400]!,
+                            color: inJourney ? theme.primary : Colors.grey[400]!,
                             width: 2,
                           ),
                         ),
@@ -834,11 +865,11 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
                           child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF004D40),
+                              color: theme.primary,
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF00695C).withAlpha(150),
+                                  color: theme.primary.withAlpha(150),
                                   blurRadius: 10,
                                   spreadRadius: 2,
                                 ),
@@ -985,12 +1016,12 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
                 Polyline(
                   points: points,
                   strokeWidth: 7.0,
-                  color: const Color(0xFF004D40).withAlpha(120),
+                  color: theme.secondary.withAlpha(120),
                 ),
                 Polyline(
                   points: points,
                   strokeWidth: 4.5,
-                  color: const Color(0xFF00695C),
+                  color: theme.primary,
                 ),
               ],
             ),
@@ -1007,7 +1038,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF00695C), width: 2),
+                          border: Border.all(color: theme.primary, width: 2),
                         ),
                       ),
                     ),
@@ -1118,7 +1149,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF00695C),
+                            color: theme.primary,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 4, offset: Offset(0, 2))],
                           ),
@@ -1134,7 +1165,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
                             ],
                           ),
                         ),
-                        const Icon(Icons.navigation, size: 22, color: Color(0xFF00695C)),
+                        Icon(Icons.navigation, size: 22, color: theme.primary),
                       ],
                     ),
                   ),
@@ -1156,7 +1187,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
                   final z = _mapController.camera.zoom + 1;
                   _mapController.move(_mapController.camera.center, z);
                 },
-                child: const Icon(Icons.add, color: Color(0xFF00695C)),
+                child: Icon(Icons.add, color: theme.primary),
               ),
               const SizedBox(height: 6),
               FloatingActionButton.small(
@@ -1166,7 +1197,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
                   final z = _mapController.camera.zoom - 1;
                   _mapController.move(_mapController.camera.center, z);
                 },
-                child: const Icon(Icons.remove, color: Color(0xFF00695C)),
+                child: Icon(Icons.remove, color: theme.primary),
               ),
               const SizedBox(height: 6),
               FloatingActionButton.small(
@@ -1175,7 +1206,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
                 onPressed: () {
                   _mapController.move(center, 12.5);
                 },
-                child: const Icon(Icons.my_location, color: Color(0xFF00695C)),
+                child: Icon(Icons.my_location, color: theme.primary),
               ),
             ],
           ),
@@ -1187,7 +1218,7 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
   Widget _buildMetric(String value, String label) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF00695C))),
+        Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: SettingsService().currentTheme.primary)),
         Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[600], fontWeight: FontWeight.w600)),
       ],
     );
