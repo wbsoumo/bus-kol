@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../services/bus_photo_service.dart';
+import '../widgets/bus_photo_viewer.dart';
 import 'live_track_sheet.dart';
 
 class ResultsScreen extends StatefulWidget {
@@ -123,44 +125,12 @@ class _ResultsScreenState extends State<ResultsScreen> {
               ),
               const SizedBox(height: 10),
 
-              // Bus Photo preview
-              Container(
-                height: 130,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE0F2F1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFB2DFDB)),
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(isAc ? Icons.airport_shuttle : Icons.directions_bus, size: 48, color: const Color(0xFF00695C)),
-                        const SizedBox(height: 6),
-                        Text(
-                          r.category.isNotEmpty ? r.category : 'West Bengal Transport Corporation',
-                          style: TextStyle(color: Colors.grey[800], fontWeight: FontWeight.bold, fontSize: 12),
-                        ),
-                        Text(
-                          'Kolkata Metropolitan Area Transit Network',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 10),
-                        ),
-                      ],
-                    ),
-                    Positioned(
-                      bottom: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                        child: Text(isAc ? '❄️ AC Coach' : 'Standard Non-AC', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
-                ),
+              // Real Bus Fleet Photo Gallery (busrepository.github.io/busrepo)
+              BusPhotoGallery(
+                routeNo: r.routeNo,
+                isAc: isAc,
+                category: r.category,
+                height: 195,
               ),
               const SizedBox(height: 14),
 
@@ -420,10 +390,10 @@ class _ResultsScreenState extends State<ResultsScreen> {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  // (i) Details Button
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
+                  // (i) Details Button with Real Fleet Photo
+                  InkWell(
                     onTap: () => _showBusInfo(r),
+                    borderRadius: BorderRadius.circular(4),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
@@ -431,12 +401,16 @@ class _ResultsScreenState extends State<ResultsScreen> {
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(color: const Color(0xFF80CBC4)),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.info_outline, size: 14, color: Color(0xFF00695C)),
-                          SizedBox(width: 3),
-                          Text('INFO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF00695C))),
+                          const Icon(Icons.info_outline, size: 14, color: Color(0xFF00695C)),
+                          const SizedBox(width: 3),
+                          const Text('INFO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF00695C))),
+                          if (BusPhotoService.hasKnownPhotos(r.routeNo)) ...[
+                            const SizedBox(width: 3),
+                            const Icon(Icons.photo_camera_rounded, size: 11, color: Color(0xFF00695C)),
+                          ],
                         ],
                       ),
                     ),

@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
 import '../services/kolkata_geo.dart';
 import '../services/notification_service.dart';
+import '../widgets/bus_photo_viewer.dart';
 
 class LiveTrackScreen extends StatefulWidget {
   final int routeId;
@@ -403,48 +404,12 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
           ),
           const SizedBox(height: 10),
 
-          // Bus Route Photo Preview Banner
-          Container(
-            height: 130,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE0F2F1),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFB2DFDB)),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      isAc ? Icons.airport_shuttle : Icons.directions_bus,
-                      size: 48,
-                      color: const Color(0xFF00695C),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'West Bengal Transport Corporation (WBTC)',
-                      style: TextStyle(color: Colors.grey[800], fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                    Text(
-                      'City Transit Service • Kolkata Metropolitan Zone',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 10),
-                    ),
-                  ],
-                ),
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                    child: Text(isAc ? '❄️ AC Electric/Diesel' : '🚌 Non-AC Standard', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
-            ),
+          // Bus Route Real Fleet Photo Gallery (busrepository.github.io/busrepo)
+          BusPhotoGallery(
+            routeNo: widget.routeNo,
+            isAc: isAc,
+            category: widget.busType,
+            height: 195,
           ),
           const SizedBox(height: 14),
 
