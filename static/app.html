@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CholoKolkata - Kolkata Bus & Metro Transit</title>
+  <meta name="description"
+    content="CholoKolkata: Where is my Bus & Kolkata Metro timings, fares, and commuter live alerts.">
+  <link rel="icon" href="assets/bus-logo.svg">
+
+  <!-- Material Android Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <!-- Android Phone Shell Frame -->
+  <div class="wimt-app-container">
+
+    <!-- ============================================== -->
+    <!-- SCREEN 1: MAIN HOME SCREEN (Spot / Metro / Chat / Fav) -->
+    <!-- ============================================== -->
+    <div id="screen-home" class="wimt-app-screen active">
+
+      <!-- Material Top App Bar -->
+      <header class="wimt-header">
+        <div class="header-main">
+          <div class="header-title-box">
+            <img src="assets/bus-logo.svg" alt="CholoKolkata Logo" class="wimt-app-logo">
+            <div class="wimt-title-text">
+              <h1 class="wimt-app-name">CholoKolkata</h1>
+              <span class="wimt-app-subtitle">Kolkata Bus & Metro • চলো কলকাতা</span>
+            </div>
+          </div>
+
+          <div class="header-toolbar-actions">
+            <a href="/download/apk" class="offline-chip" title="Download CholoKolkata Android App" style="text-decoration:none;background:rgba(255,255,255,0.2);color:#fff;">
+              <i class="fa-brands fa-android"></i>
+              <span>GET APK</span>
+            </a>
+            <div class="offline-chip" title="Offline Protected Database">
+              <i class="fa-solid fa-shield-halved"></i>
+              <span>OTA SYNC</span>
+            </div>
+            <button id="lang-toggle-btn" class="toolbar-btn" title="Toggle English / বাংলা">বাং</button>
+            <button id="view-mode-toggle" class="toolbar-btn" title="Toggle Fullscreen / Mobile Frame"><i
+                class="fa-solid fa-mobile-screen"></i></button>
+          </div>
+        </div>
+
+        <!-- Material Top Tabs (SPOT / METRO / LIVE CHAT / FAVORITES) -->
+        <nav class="wimt-tabs">
+          <button class="wimt-tab active" data-tab="tab-spot">
+            <i class="fa-solid fa-bus"></i>
+            <span>BUSES</span>
+          </button>
+          <button class="wimt-tab" data-tab="tab-metro">
+            <i class="fa-solid fa-train-subway"></i>
+            <span>METRO</span>
+            <span class="tab-chip chip-live">LIVE</span>
+          </button>
+          <button class="wimt-tab" data-tab="tab-chat">
+            <i class="fa-solid fa-comments"></i>
+            <span>COMMUNITY</span>
+            <span class="live-pulse-dot"></span>
+          </button>
+          <button class="wimt-tab" data-tab="tab-favs">
+            <i class="fa-solid fa-star"></i>
+            <span>STARRED</span>
+          </button>
+        </nav>
+      </header>
+
+      <!-- Main Scrollable Body -->
+      <main class="wimt-body" id="app-body-container">
+
+        <!-- TAB 1: SPOT BUS SCREEN -->
+        <section id="tab-spot" class="wimt-page active">
+
+          <!-- CARD 1: MAIN SEARCH (From ➔ To) -->
+          <div class="wimt-card search-card-wimt">
+            <div class="stations-input-container">
+
+              <!-- From Station Field -->
+              <div class="station-field" id="from-field-box">
+                <span class="dot-indicator green-dot"></span>
+                <div class="field-text-box">
+                  <label for="from-input" class="station-label">From Bus Stop</label>
+                  <input type="text" id="from-input" placeholder="e.g. Howrah Station, Ultadanga" autocomplete="off">
+                </div>
+                <button class="input-clear-btn" id="clear-from-btn"><i class="fa-solid fa-xmark"></i></button>
+                <div class="wimt-autocomplete" id="from-suggestions"></div>
+              </div>
+
+              <!-- Dashed Line & Circular Swap Button -->
+              <div class="stations-divider-row">
+                <div class="dashed-connector"></div>
+                <button id="swap-stops-btn" class="wimt-swap-btn" title="Swap Stations">
+                  <i class="fa-solid fa-arrows-up-down"></i>
+                </button>
+              </div>
+
+              <!-- To Station Field -->
+              <div class="station-field" id="to-field-box">
+                <span class="dot-indicator red-dot"></span>
+                <div class="field-text-box">
+                  <label for="to-input" class="station-label">To Bus Stop</label>
+                  <input type="text" id="to-input" placeholder="e.g. Sector V (Salt Lake), Esplanade"
+                    autocomplete="off">
+                </div>
+                <button class="input-clear-btn" id="clear-to-btn"><i class="fa-solid fa-xmark"></i></button>
+                <div class="wimt-autocomplete" id="to-suggestions"></div>
+              </div>
+
+            </div>
+
+            <!-- Inline Notice Message (No popups) -->
+            <div id="search-alert" class="wimt-alert-banner hidden">
+              <i class="fa-solid fa-circle-exclamation"></i>
+              <span id="alert-text">Please enter both departure and destination stops.</span>
+            </div>
+
+            <!-- Solid Teal Action Button -->
+            <button id="find-buses-btn" class="wimt-primary-btn">
+              FIND BUSES
+            </button>
+          </div>
+
+          <!-- CARD 2: BUS NO. / NAME LOOKUP -->
+          <div class="wimt-card utility-card">
+            <div class="utility-card-header">
+              <span class="utility-title"><i class="fa-solid fa-hashtag" style="color: #00897B; margin-right: 6px;"></i>
+                Bus No. / Route Name</span>
+            </div>
+            <div class="utility-input-row">
+              <input type="text" id="busno-input" placeholder="e.g. 215A, S12, AC-12, 12C, C, 44A" autocomplete="off">
+              <button id="busno-search-btn" class="utility-btn">FIND ROUTE</button>
+            </div>
+          </div>
+
+          <!-- CARD 3: LIVE BUS STOP LOOKUP ("Live Station") -->
+          <div class="wimt-card utility-card">
+            <div class="utility-card-header">
+              <span class="utility-title"><i class="fa-solid fa-signs-post"
+                  style="color: #00897B; margin-right: 6px;"></i> Live Bus Stop Board</span>
+            </div>
+            <div class="utility-input-row" style="position: relative;">
+              <input type="text" id="live-stop-input" placeholder="Type bus stop (e.g. Howrah, Esplanade, Ruby)"
+                autocomplete="off">
+              <button id="live-stop-btn" class="utility-btn">DEPARTURES</button>
+              <div class="wimt-autocomplete" id="live-stop-suggestions"></div>
+            </div>
+          </div>
+
+          <!-- CARD 4: RECENT SEARCHES (Exact WIMT Commuter Flow) -->
+          <div class="recent-searches-block">
+            <div class="section-label-bar">
+              <span><i class="fa-solid fa-clock-rotate-left"></i> RECENT SEARCHES</span>
+              <span class="clear-history-text" id="clear-history-btn">Clear</span>
+            </div>
+            <div class="recent-list" id="recent-searches-list">
+              <!-- Dynamically populated or default popular searches -->
+            </div>
+          </div>
+
+          <!-- CARD 5: DOWNLOAD ANDROID APP -->
+          <div class="wimt-card" style="background: linear-gradient(135deg, #00695c, #00897b); color: #fff; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px;">
+            <div>
+              <div style="font-weight: 800; font-size: 14px;">📱 Download CholoKolkata App</div>
+              <div style="font-size: 11px; opacity: 0.9; margin-top: 2px;">100% offline 2,172+ Kolkata bus routes &amp; Metro planner</div>
+            </div>
+            <a href="/download/apk" style="background: #fff; color: #00695c; font-weight: 800; font-size: 12px; padding: 8px 14px; border-radius: 8px; text-decoration: none; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+              Download APK
+            </a>
+          </div>
+
+        </section>
+
+        <!-- TAB 2: METRO (Kolkata Metro Full Delhi Metro Style Engine) -->
+        <section id="tab-metro" class="wimt-page">
+          <div class="metro-view-container">
+
+            <!-- CARD: DELHI METRO STYLE ROUTE & FARE PLANNER -->
+            <div class="wimt-card metro-planner-card">
+              <div class="planner-title-row">
+                <span class="planner-title"><i class="fa-solid fa-route" style="color: #00897B; margin-right: 6px;"></i>
+                  Station to Station Route Planner</span>
+              </div>
+
+              <div class="stations-input-container metro-inputs">
+                <div class="station-field">
+                  <span class="dot-indicator green-dot"></span>
+                  <div class="field-text-box">
+                    <label for="metro-from-select" class="station-label">Boarding Metro Station</label>
+                    <select id="metro-from-select" class="wimt-metro-select">
+                      <option value="">Select departure station...</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="stations-divider-row">
+                  <div class="dashed-connector"></div>
+                  <button id="metro-swap-btn" class="wimt-swap-btn" title="Swap Stations">
+                    <i class="fa-solid fa-arrows-up-down"></i>
+                  </button>
+                </div>
+
+                <div class="station-field">
+                  <span class="dot-indicator red-dot"></span>
+                  <div class="field-text-box">
+                    <label for="metro-to-select" class="station-label">Destination Metro Station</label>
+                    <select id="metro-to-select" class="wimt-metro-select">
+                      <option value="">Select arrival station...</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div id="metro-alert" class="wimt-alert-banner hidden">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span id="metro-alert-text">Please choose both boarding and destination metro stations.</span>
+              </div>
+
+              <button id="metro-plan-btn" class="wimt-primary-btn metro-primary-btn">
+                <i class="fa-solid fa-train-subway"></i> SHOW ROUTE & FARE
+              </button>
+            </div>
+
+            <!-- RESULT: METRO JOURNEY RESULT CARD (Delhi Metro App Style) -->
+            <div id="metro-plan-result" class="metro-journey-card hidden">
+              <div class="journey-header">
+                <div class="journey-title-box">
+                  <span class="journey-route-badge" id="metro-res-type">DIRECT TRAIN</span>
+                  <h3 id="metro-res-title">Howrah Maidan ➔ Esplanade</h3>
+                </div>
+                <div class="journey-fare-badge">
+                  <span class="fare-num" id="metro-res-fare">₹10</span>
+                  <span class="fare-sub">Single Journey</span>
+                </div>
+              </div>
+
+              <div class="journey-stats-row">
+                <div class="stat-pill"><i class="fa-solid fa-clock"></i> <span id="metro-res-duration">8 mins</span>
+                </div>
+                <div class="stat-pill"><i class="fa-solid fa-landmark"></i> <span id="metro-res-stations">4
+                    Stations</span></div>
+                <div class="stat-pill"><i class="fa-solid fa-road"></i> <span id="metro-res-distance">4.8 km</span>
+                </div>
+              </div>
+
+              <div class="interchange-banner hidden" id="metro-res-interchange">
+                <i class="fa-solid fa-shuffle"></i>
+                <span id="metro-interchange-text">Interchange at Esplanade: Switch between Blue and Green Lines.</span>
+              </div>
+
+              <div class="journey-timeline-container" id="metro-stations-timeline">
+                <!-- Station timeline nodes injected dynamically -->
+              </div>
+            </div>
+
+            <!-- CORRIDORS DIRECTORY WITH TIMINGS & HEADWAY -->
+            <div class="section-label-bar">
+              <span>METRO CORRIDOR DIRECTORY & TIMINGS</span>
+            </div>
+
+            <div class="metro-corridors-list" id="metro-lines-directory">
+              <!-- Populated dynamically via /api/metro/lines -->
+            </div>
+
+          </div>
+        </section>
+
+        <!-- TAB 3: COMMUNITY CHAT (m-Indicator Style Live Transit Crowd-source) -->
+        <section id="tab-chat" class="wimt-page">
+          <div class="chat-view-container">
+
+            <div class="chat-header-banner">
+              <div class="chat-header-text">
+                <h2>Commuter Community Feed</h2>
+                <p>Live passenger traffic alerts, jam reports & bus updates • কলকাতা যাত্রী চ্যাট</p>
+              </div>
+              <div class="live-counter-chip">
+                <span class="blink-dot"></span>
+                <span id="chat-active-count">48 active commuters</span>
+              </div>
+            </div>
+
+            <!-- CHANNEL FILTER TABS -->
+            <div class="chat-channel-bar">
+              <button class="channel-pill active" data-channel="general"># ALL KOLKATA</button>
+              <button class="channel-pill" data-channel="howrah"># HOWRAH</button>
+              <button class="channel-pill" data-channel="sealdah"># SEALDAH & BYPASS</button>
+              <button class="channel-pill" data-channel="metro"># METRO ALERTS</button>
+              <button class="channel-pill" data-channel="airport"># AIRPORT / NORTH</button>
+            </div>
+
+            <!-- POST ALERT COMPOSER CARD -->
+            <div class="wimt-card chat-composer-card">
+              <div class="composer-header">
+                <span><i class="fa-solid fa-bullhorn" style="color: #00897B; margin-right: 6px;"></i> Post Live Commuter
+                  Update</span>
+              </div>
+
+              <div class="composer-inputs-grid">
+                <input type="text" id="chat-user-input" placeholder="Your Name / Handle (e.g. Sourav_Garia)"
+                  class="chat-input-text" maxlength="30">
+                <input type="text" id="chat-route-input" placeholder="Bus No. or Area (e.g. 215A, Karunamoyee)"
+                  class="chat-input-text" maxlength="30">
+              </div>
+
+              <!-- STATUS CHIPS SELECTOR -->
+              <div class="status-tags-selector">
+                <button type="button" class="status-tag-btn active" data-status="Normal">🟢 Moving Smooth</button>
+                <button type="button" class="status-tag-btn" data-status="Heavy Jam">🔴 Heavy Jam</button>
+                <button type="button" class="status-tag-btn" data-status="Bus Arrived">🔵 Bus Arrived</button>
+                <button type="button" class="status-tag-btn" data-status="Crowded">🟠 Huge Rush</button>
+              </div>
+
+              <div class="composer-submit-row">
+                <input type="text" id="chat-msg-input"
+                  placeholder="Share live status (e.g. Light traffic near Karunamoyee, bus departed 2 mins ago)"
+                  class="chat-msg-text" maxlength="160">
+                <button id="chat-post-btn" class="chat-send-btn" title="Post Live Update">
+                  <i class="fa-solid fa-paper-plane"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- MESSAGES FEED -->
+            <div class="chat-feed-section">
+              <div class="feed-header-row">
+                <span><i class="fa-solid fa-clock-rotate-left"></i> RECENT UPDATES</span>
+                <button id="chat-refresh-btn" class="chat-refresh-action"><i class="fa-solid fa-rotate"></i>
+                  Refresh</button>
+              </div>
+
+              <div id="chat-messages-list" class="chat-messages-container">
+                <!-- Messages populated dynamically -->
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- TAB 3: FAVORITES SCREEN -->
+        <section id="tab-favs" class="wimt-page">
+          <div class="favs-view-container">
+            <div class="section-label-bar">
+              <span>SAVED TRIPS & BUSES</span>
+            </div>
+
+            <div id="favorites-list" class="buses-cards-stack"></div>
+
+            <div id="empty-favs" class="empty-placeholder">
+              <i class="fa-regular fa-star" style="font-size: 2.2rem; color: #B0BEC5;"></i>
+              <h4>No Starred Routes Yet</h4>
+              <p>Tap the <strong>⭐ Star icon</strong> on any bus result to save your daily commute for instant tracking.
+              </p>
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- SCREEN 2: DEDICATED FULL-SCREEN SEARCH RESULTS           -->
+    <!-- (Opens as a full new screen just like Where is My Train) -->
+    <!-- ======================================================== -->
+    <div id="screen-results" class="wimt-app-screen">
+
+      <!-- Results Full Screen Top Header Bar -->
+      <header class="results-screen-header">
+        <button id="results-back-btn" class="header-back-arrow" title="Back to Search">
+          <i class="fa-solid fa-arrow-left"></i>
+        </button>
+
+        <div class="results-header-info">
+          <div class="results-stn-pair" id="results-stn-pair-title">Howrah Station ➔ Sector V</div>
+          <div class="results-status-line" id="results-status-subtitle">Runs Daily • Loading connecting buses...</div>
+        </div>
+
+        <button id="results-swap-refresh-btn" class="header-refresh-action" title="Swap & Refresh">
+          <i class="fa-solid fa-arrows-up-down"></i>
+        </button>
+      </header>
+
+      <!-- Quick Filter Strip (All, AC, State, Mini) -->
+      <div class="results-filter-bar">
+        <button class="filter-tab-pill active" data-filter="all">ALL</button>
+        <button class="filter-tab-pill" data-filter="ac">AC BUSES</button>
+        <button class="filter-tab-pill" data-filter="state">STATE (WBTC)</button>
+        <button class="filter-tab-pill" data-filter="mini">MINIBUS</button>
+      </div>
+
+      <!-- Scrollable List of Buses -->
+      <div class="results-screen-body">
+        <div id="full-screen-results-list" class="buses-cards-stack">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- SIGNATURE WIMT "LIVE STATUS / TRACK TIMELINE" MODAL      -->
+    <!-- ======================================================== -->
+    <div id="wimt-track-modal" class="track-modal-overlay hidden">
+      <div class="modal-backdrop" id="track-backdrop"></div>
+
+      <div class="track-bottom-sheet">
+        <div class="sheet-drag-notch"></div>
+
+        <div class="track-sheet-header">
+          <button class="sheet-back-arrow" id="sheet-close-btn" title="Back">
+            <i class="fa-solid fa-arrow-left"></i>
+          </button>
+
+          <div class="sheet-train-info">
+            <div class="train-badge-row">
+              <span class="bus-number-chip" id="modal-route-no">215A</span>
+              <span class="bus-type-tag" id="modal-route-type">ORDINARY BUS</span>
+              <span class="bus-zone-tag" id="modal-route-zone">KOLKATA</span>
+            </div>
+            <div class="sheet-train-title" id="modal-route-name">Howrah Station ➔ Sector V</div>
+          </div>
+
+          <button class="sheet-reverse-action" id="modal-reverse-btn" title="Reverse Up/Down Direction">
+            <i class="fa-solid fa-arrow-right-arrow-left"></i>
+          </button>
+        </div>
+
+        <div class="live-status-ribbon">
+          <div class="ribbon-text">
+            <i class="fa-solid fa-circle-check"></i>
+            <span id="modal-status-text">Runs Daily • Normal Frequency</span>
+          </div>
+          <button class="btn-timetable-photo hidden" id="modal-image-btn">
+            <i class="fa-solid fa-image"></i> Schedule Photo
+          </button>
+        </div>
+
+        <div class="journey-picker-strip">
+          <div class="picker-column">
+            <div class="picker-label-text"><span class="dot-small green-dot"></span> Boarding Stop</div>
+            <select id="modal-from-select" class="wimt-picker-select"></select>
+          </div>
+          <div class="picker-divider-icon"><i class="fa-solid fa-arrow-right"></i></div>
+          <div class="picker-column">
+            <div class="picker-label-text"><span class="dot-small red-dot"></span> Destination Stop</div>
+            <select id="modal-to-select" class="wimt-picker-select"></select>
+          </div>
+        </div>
+
+        <div class="journey-metrics-strip">
+          <div class="metric-cell">
+            <span class="m-val" id="metric-stops">16</span>
+            <span class="m-lbl">Stops Between</span>
+          </div>
+          <div class="metric-cell">
+            <span class="m-val" id="metric-duration">~45 m</span>
+            <span class="m-lbl">Est. Time</span>
+          </div>
+          <div class="metric-cell">
+            <span class="m-val" id="metric-dist">~18 km</span>
+            <span class="m-lbl">Distance</span>
+          </div>
+        </div>
+
+        <div class="track-scroll-area">
+          <div class="track-column-headers">
+            <span class="col-dist">KM</span>
+            <span class="col-stn">STATION / BUS STOP</span>
+            <span class="col-bay">BAY / STAND</span>
+          </div>
+
+          <div class="vertical-rail-track" id="modal-track-stops">
+            <!-- Dynamic station nodes and rail line with bus sprite -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Timetable Photo Viewer Modal -->
+    <div id="photo-viewer-modal" class="photo-viewer-overlay hidden">
+      <div class="modal-backdrop" id="photo-backdrop"></div>
+      <div class="photo-card">
+        <div class="photo-header">
+          <span id="photo-title">Timetable Schedule</span>
+          <button id="photo-close-btn" class="photo-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="photo-body">
+          <img id="photo-img" src="" alt="Bus Timetable">
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+
+</html>

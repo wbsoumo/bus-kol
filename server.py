@@ -190,6 +190,10 @@ def calculate_metro_fare(distance_km):
 def index():
     return send_from_directory('static', 'index.html')
 
+@app.route('/app')
+def web_app():
+    return send_from_directory('static', 'app.html')
+
 @app.route('/download/apk')
 def download_android_apk():
     apk_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'CholoKolkata-release.apk')

@@ -8,6 +8,12 @@ RewriteRule ^admin/(.*)$ admin/$1 [QSA,L]
 # Direct Android APK download endpoint
 RewriteRule ^download/apk/?$ api.php?endpoint=app/download [QSA,L]
 
+# Interactive Web App view & static asset passthrough
+RewriteRule ^app/?$ static/app.html [L]
+RewriteRule ^assets/(.*)$ static/assets/$1 [L]
+RewriteRule ^css/(.*)$ static/css/$1 [L]
+RewriteRule ^js/(.*)$ static/js/$1 [L]
+
 # Route all /api/* requests to high-performance native PHP router
 RewriteRule ^api/(.*)$ api.php?endpoint=$1 [QSA,L]
 
