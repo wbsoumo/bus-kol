@@ -1,0 +1,19 @@
+{
+  "name": "CholoKolkata (চলো কলকাতা)",
+  "short_name": "CholoKolkata",
+  "description": "Kolkata Bus & Metro Offline Transit App covering 2,172+ bus routes, 2,327 stops, official fares, and all 5 Kolkata Metro corridors.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#1565c0",
+  "lang": "en-IN",
+  "icons": [
+    {
+      "src": "/static/assets/app-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
