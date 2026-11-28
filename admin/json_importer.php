@@ -179,7 +179,7 @@ function ensure_ota_transit_schema(mysqli $db)
                     $stopsJson = json_encode($item['stops'] ?? [], JSON_UNESCAPED_UNICODE);
 
                     $stmt->bind_param(
-                        'issssssiissiidisss',
+                        'issssssiissiidiss',
                         $extId, $rid, $rCode, $rn, $orig, $dest, $sigKey,
                         $hwP, $hwO, $fs, $ls, $fMin, $fMax, $km, $dur, $notes, $stopsJson
                     );
