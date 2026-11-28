@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import 'kolkata_stops.dart';
 
-class _OfflineRouteRecord {
+class BusRouteRawRecord {
   final int id;
   final String routeNo;
   final String routeNoCompact;
@@ -19,7 +19,7 @@ class _OfflineRouteRecord {
   final List<String> stops;
   final List<String> stopsLower;
 
-  _OfflineRouteRecord({
+  BusRouteRawRecord({
     required this.id,
     required this.routeNo,
     required this.routeNoCompact,
@@ -33,6 +33,8 @@ class _OfflineRouteRecord {
     required this.stopsLower,
   });
 }
+
+typedef _OfflineRouteRecord = BusRouteRawRecord;
 
 class BusDataService extends ChangeNotifier {
   static final BusDataService _instance = BusDataService._internal();
@@ -109,8 +111,13 @@ class BusDataService extends ChangeNotifier {
   ];
 
   int get totalRoutesCount => _allRecords.length;
+  List<BusRouteRawRecord> get rawRecords => _allRecords;
   String get dataVersion => _dataVersion;
   String get lastSyncTime => _lastSyncTime;
+
+  static List<String> expandStopTermsPublic(String raw) => _expandStopTerms(raw);
+  static int findStopIndexPublic(List<String> stopsLower, List<String> terms, {int startAt = 0}) =>
+      _findStopIndex(stopsLower, terms, startAt: startAt);
 
   Future<void> init() async {
     if (_isInitialized) return;

@@ -14,9 +14,9 @@ void main() {
     BusDataService().loadFromJsonStrings(routesJson, stopsJson);
   });
 
-  test('loads all 2,172 routes and 2,327+ stops offline', () {
-    expect(BusDataService().totalRoutesCount, 2172);
-    expect(KolkataStops.totalStopsCount, greaterThanOrEqualTo(2327));
+  test('loads all 3,176 routes and 2,387+ stops offline', () {
+    expect(BusDataService().totalRoutesCount, 3176);
+    expect(KolkataStops.totalStopsCount, greaterThanOrEqualTo(2387));
   });
 
   test('stop autocomplete searches all 2,327 stops with aliases', () {

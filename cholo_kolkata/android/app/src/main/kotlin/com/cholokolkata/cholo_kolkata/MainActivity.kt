@@ -147,6 +147,64 @@ class MainActivity : FlutterActivity() {
                 "getCacheDir" -> {
                     result.success(cacheDir.absolutePath)
                 }
+                "openExternalApp" -> {
+                    val pkgName = call.argument<String>("packageName") ?: ""
+                    val deepLinkUrl = call.argument<String>("deepLinkUrl") ?: ""
+                    val fallbackToBrowser = call.argument<Boolean>("fallbackToBrowser") ?: false
+                    try {
+                        val launchIntent = if (pkgName.isNotEmpty()) {
+                            packageManager.getLaunchIntentForPackage(pkgName)
+                        } else null
+
+                        if (launchIntent != null) {
+                            if (deepLinkUrl.isNotEmpty()) {
+                                try {
+                                    val deepIntent = Intent(Intent.ACTION_VIEW, Uri.parse(deepLinkUrl)).apply {
+                                        setPackage(pkgName)
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    startActivity(deepIntent)
+                                    result.success("opened_deep_link")
+                                    return@setMethodCallHandler
+                                } catch (_: Exception) {}
+                            }
+                            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(launchIntent)
+                            result.success("opened_app")
+                            return@setMethodCallHandler
+                        }
+
+                        if (fallbackToBrowser && deepLinkUrl.isNotEmpty()) {
+                            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(deepLinkUrl)).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(browserIntent)
+                            result.success("opened_browser")
+                            return@setMethodCallHandler
+                        }
+
+                        if (pkgName.isNotEmpty()) {
+                            try {
+                                val marketIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkgName")).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                startActivity(marketIntent)
+                                result.success("opened_playstore")
+                                return@setMethodCallHandler
+                            } catch (_: Exception) {
+                                val webStore = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$pkgName")).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                startActivity(webStore)
+                                result.success("opened_playstore_web")
+                                return@setMethodCallHandler
+                            }
+                        }
+                        result.success("failed")
+                    } catch (e: Exception) {
+                        result.success("failed")
+                    }
+                }
                 "openUrl" -> {
                     val url = call.argument<String>("url") ?: ""
                     val isPlayStore = call.argument<Boolean>("isPlayStore") ?: false

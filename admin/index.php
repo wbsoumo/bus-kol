@@ -6,6 +6,7 @@
  */
 
 session_start();
+require_once __DIR__ . '/json_importer.php';
 
 // Admin Authentication Passcode
 define('ADMIN_PASSCODE', 'cholo2026admin');
@@ -76,8 +77,12 @@ if (!$is_authenticated && !empty($action)) {
     exit;
 }
 
-function admin_bump_ota_version($changelog = null) {
+function admin_bump_ota_version($changelog = null, $db = null) {
     $version_file = __DIR__ . '/../ota_version.json';
+    if ($db instanceof mysqli) {
+        $info = cholo_bump_ota_version_with_counts($version_file, $db, $changelog);
+        return $info['version'];
+    }
     $current_v = '2.4.0';
     if (file_exists($version_file)) {
         $vdata = json_decode(file_get_contents($version_file), true);
@@ -101,6 +106,9 @@ function admin_bump_ota_version($changelog = null) {
 }
 
 $db = get_admin_db();
+if ($db) {
+    ensure_ota_transit_schema($db);
+}
 
 // 3. API Action: Get Route Details with Stops Timeline
 if ($action === 'get_route') {
@@ -204,7 +212,7 @@ if ($action === 'add_route' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $master_stop_stmt->execute();
     }
 
-    $new_v = admin_bump_ota_version("Added route $route_no ($origin ➔ $destination).");
+    $new_v = admin_bump_ota_version("Added route $route_no ($origin ➔ $destination).", $db);
 
     echo json_encode([
         'success' => true,
@@ -287,7 +295,7 @@ if ($action === 'edit_route' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $master_stop_stmt->execute();
     }
 
-    $new_v = admin_bump_ota_version("Updated route $route_no ($origin ➔ $destination).");
+    $new_v = admin_bump_ota_version("Updated route $route_no ($origin ➔ $destination).", $db);
 
     echo json_encode([
         'success' => true,
@@ -317,7 +325,7 @@ if ($action === 'delete_route' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->bind_param("i", $route_id);
 
     if ($stmt->execute()) {
-        $new_v = admin_bump_ota_version("Removed bus route ID #$route_id.");
+        $new_v = admin_bump_ota_version("Removed bus route ID #$route_id.", $db);
         echo json_encode(['success' => true, 'message' => "Route and its stops deleted successfully (OTA v$new_v).", 'ota_version' => $new_v]);
     } else {
         echo json_encode(['success' => false, 'error' => 'Delete failed: ' . $db->error]);
@@ -328,35 +336,166 @@ if ($action === 'delete_route' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 // 7. API Action: Publish / Bump OTA Sync Version
 if ($action === 'bump_sync' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=utf-8');
-    $version_file = __DIR__ . '/../ota_version.json';
-    $current_v = '2.4.0';
-    if (file_exists($version_file)) {
-        $vdata = json_decode(file_get_contents($version_file), true);
-        if (isset($vdata['version'])) $current_v = $vdata['version'];
-    }
-
-    // Bump minor version
-    $parts = explode('.', $current_v);
-    if (count($parts) === 3) {
-        $parts[2] = intval($parts[2]) + 1;
-        $new_v = implode('.', $parts);
-    } else {
-        $new_v = '2.4.1';
-    }
-
-    $save_data = [
-        'version' => $new_v,
-        'has_updates' => true,
-        'changelog' => "New bus routes and transit schedules published by administrator (v$new_v).",
-        'last_updated' => date('Y-m-d H:i:s T')
-    ];
-    file_put_contents($version_file, json_encode($save_data, JSON_PRETTY_PRINT));
+    $new_v = admin_bump_ota_version(null, $db);
 
     echo json_encode([
         'success' => true,
         'version' => $new_v,
         'message' => "OTA sync broadcasted! Mobile apps will update to v$new_v silently."
     ]);
+    exit;
+}
+
+// 7B. API Action: Download Sample JSON Format
+if ($action === 'sample_json') {
+    header('Content-Type: application/json; charset=utf-8');
+    $stype = trim($_GET['type'] ?? 'auto_routes');
+    $samples = [
+        'auto_routes' => [
+            [
+                'id' => 79001,
+                'rid' => 'auto_ultadanga_sector_v',
+                'r' => 'A-91',
+                'rn' => 'Ultadanga - Sector V',
+                'f' => 'Ultadanga',
+                't' => 'Sector V',
+                'hwP' => 5,
+                'hwO' => 10,
+                'fs' => '06:00',
+                'ls' => '22:30',
+                'fMin' => 15,
+                'fMax' => 20,
+                'km' => 6.2,
+                'dur' => 22,
+                'nt' => 'Salt Lake VIP Crossing via Karunamoyee',
+                'stops' => [
+                    ['n' => 'Ultadanga', 'lat' => 22.5975, 'lng' => 88.3887],
+                    ['n' => 'Karunamoyee', 'lat' => 22.5860, 'lng' => 88.4230],
+                    ['n' => 'Sector V', 'lat' => 22.5804, 'lng' => 88.4378],
+                ],
+            ],
+        ],
+        'bus_routes' => [
+            'AC-54' => [
+                [
+                    'r' => 'AC-54',
+                    'f' => 'Howrah Station',
+                    't' => 'Ballygunge Station',
+                    'rn' => 'Howrah Station to Ballygunge Station',
+                    'bt' => 'AC Electric Bus',
+                    'cat' => 'West Bengal Transport Corporation',
+                    'tt' => '06:00 AM - 09:30 PM (Every 15 mins)',
+                    's' => ['Howrah Station', 'Esplanade', 'Park Street', 'Rabindra Sadan', 'Gariahat', 'Ballygunge Station'],
+                ],
+            ],
+        ],
+        'stop_coords' => [
+            'esplanade' => [22.5645, 88.3524],
+            'sector v' => [22.5804, 88.4378],
+        ],
+        'stops' => [
+            ['n' => 'Esplanade', 'c' => 909],
+            ['n' => 'Howrah Station', 'c' => 520],
+        ],
+    ];
+    echo json_encode($samples[$stype] ?? $samples['auto_routes'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// Helper to parse uploaded JSON from multipart file OR json_text
+function admin_read_uploaded_json_payload() {
+    $raw = '';
+    if (!empty($_FILES['json_file']['tmp_name']) && is_uploaded_file($_FILES['json_file']['tmp_name'])) {
+        $raw = file_get_contents($_FILES['json_file']['tmp_name']);
+    } elseif (!empty($_POST['json_text'])) {
+        $raw = (string) $_POST['json_text'];
+    } else {
+        $body = file_get_contents('php://input');
+        if ($body && strpos($body, '{') === 0 || strpos($body, '[') === 0) {
+            $raw = $body;
+        }
+    }
+    if (trim($raw) === '') {
+        return ['ok' => false, 'error' => 'Please upload a .json file or paste JSON content.'];
+    }
+    // Strip UTF-8 BOM if present
+    $raw = preg_replace('/^\xEF\xBB\xBF/', '', $raw);
+    $decoded = json_decode($raw, true);
+    if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+        return ['ok' => false, 'error' => 'Invalid JSON syntax: ' . json_last_error_msg()];
+    }
+    return ['ok' => true, 'data' => $decoded];
+}
+
+// 7C. API Action: Dry-Run Analyze & Duplicate Detection
+if ($action === 'analyze_json' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=utf-8');
+    if (!$db) {
+        echo json_encode(['success' => false, 'error' => 'MySQL database unavailable']);
+        exit;
+    }
+    $parsed = admin_read_uploaded_json_payload();
+    if (!$parsed['ok']) {
+        echo json_encode(['success' => false, 'error' => $parsed['error']]);
+        exit;
+    }
+    $hint = trim($_POST['format_hint'] ?? 'auto');
+    $detected = cholo_detect_json_format($parsed['data'], $hint);
+    if (!$detected) {
+        echo json_encode(['success' => false, 'error' => 'Unrecognized JSON structure. Choose a target dataset type manually or check format samples.']);
+        exit;
+    }
+    $existing = cholo_load_existing_state($db, $detected);
+    $analysis = cholo_analyze_upload($parsed['data'], $existing, $detected);
+    if (empty($analysis['success'])) {
+        echo json_encode($analysis);
+        exit;
+    }
+    // Strip heavy 'normalized' payload from preview JSON response to keep UI snappy on 1,500+ routes
+    $previewItems = array_map(function ($it) {
+        unset($it['normalized']);
+        return $it;
+    }, $analysis['items']);
+    echo json_encode([
+        'success' => true,
+        'detected_type' => $analysis['detected_type'],
+        'summary' => $analysis['summary'],
+        'checks_run' => $analysis['checks_run'],
+        'items' => $previewItems,
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// 7D. API Action: Commit Analyzed JSON & Push OTA
+if ($action === 'commit_json' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=utf-8');
+    if (!$db) {
+        echo json_encode(['success' => false, 'error' => 'MySQL database unavailable']);
+        exit;
+    }
+    $parsed = admin_read_uploaded_json_payload();
+    if (!$parsed['ok']) {
+        echo json_encode(['success' => false, 'error' => $parsed['error']]);
+        exit;
+    }
+    $hint = trim($_POST['format_hint'] ?? 'auto');
+    $mode = trim($_POST['mode'] ?? 'skip_duplicates');
+    $detected = cholo_detect_json_format($parsed['data'], $hint);
+    if (!$detected) {
+        echo json_encode(['success' => false, 'error' => 'Unrecognized JSON schema.']);
+        exit;
+    }
+    $existing = cholo_load_existing_state($db, $detected);
+    $analysis = cholo_analyze_upload($parsed['data'], $existing, $detected);
+    if (empty($analysis['success'])) {
+        echo json_encode($analysis);
+        exit;
+    }
+    $result = cholo_commit_import($db, $analysis, $mode, __DIR__ . '/../ota_version.json');
+    if (!empty($result['success'])) {
+        $result['message'] = "Published {$result['detected_type']}! Added {$result['inserted']}, updated {$result['updated']}, skipped {$result['skipped']} (OTA v{$result['ota_version']}).";
+    }
+    echo json_encode($result, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -414,15 +553,17 @@ $stats = [
     'total_routes' => 0,
     'total_stops' => 0,
     'ac_routes' => 0,
+    'auto_routes' => 0,
+    'stop_coords' => 0,
     'metro_stations' => 50,
 ];
 
 if ($db) {
-    $r1 = $db->query("SELECT COUNT(*) AS c FROM routes");
-    if ($r1 && $row = $r1->fetch_assoc()) $stats['total_routes'] = $row['c'];
-
-    $r2 = $db->query("SELECT COUNT(*) AS c FROM stops");
-    if ($r2 && $row = $r2->fetch_assoc()) $stats['total_stops'] = $row['c'];
+    $ota_counts = cholo_get_ota_counts($db);
+    $stats['total_routes'] = $ota_counts['bus_routes'];
+    $stats['total_stops'] = $ota_counts['stops'];
+    $stats['auto_routes'] = $ota_counts['auto_routes'];
+    $stats['stop_coords'] = $ota_counts['stop_coords'];
 
     $r3 = $db->query("SELECT COUNT(*) AS c FROM routes WHERE bus_type LIKE '%AC%' OR route_no LIKE 'AC%'");
     if ($r3 && $row = $r3->fetch_assoc()) $stats['ac_routes'] = $row['c'];
@@ -430,7 +571,7 @@ if ($db) {
 
 // Search and Pagination for Routes
 $active_tab = trim($_GET['tab'] ?? 'routes');
-if (!in_array($active_tab, ['routes', 'analytics', 'chat', 'app_update'])) {
+if (!in_array($active_tab, ['routes', 'json_import', 'analytics', 'chat', 'app_update'])) {
     $active_tab = 'routes';
 }
 
@@ -722,14 +863,14 @@ function togglePass() {
 
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
                 <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Metro Stations</span>
-                    <span class="p-2 bg-emerald-50 text-emerald-600 rounded-xl text-lg">🚇</span>
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Auto &amp; GPS OTA</span>
+                    <span class="p-2 bg-emerald-50 text-emerald-600 rounded-xl text-lg">🛺</span>
                 </div>
                 <div class="mt-3">
-                    <span class="text-2xl font-black text-slate-900">50</span>
-                    <span class="text-xs text-emerald-600 font-bold ml-1.5">4 Corridors</span>
+                    <span class="text-2xl font-black text-slate-900"><?= number_format($stats['auto_routes']) ?></span>
+                    <span class="text-xs text-emerald-600 font-bold ml-1.5">Auto</span>
                 </div>
-                <p class="text-[11px] text-slate-400 mt-1">Blue, Green, Purple, Orange</p>
+                <p class="text-[11px] text-slate-400 mt-1"><?= number_format($stats['stop_coords']) ?> geocoded GPS stops • 50 Metro</p>
             </div>
         </div>
 
@@ -737,6 +878,9 @@ function togglePass() {
         <div class="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200/80 shadow-sm">
             <a href="/admin?tab=routes" class="px-4 py-2 rounded-xl text-xs font-extrabold transition <?= $active_tab === 'routes' ? 'royal-gradient text-white shadow' : 'text-slate-600 hover:bg-slate-100' ?>">
                 🚌 Bus Routes Directory
+            </a>
+            <a href="/admin?tab=json_import" class="px-4 py-2 rounded-xl text-xs font-extrabold transition <?= $active_tab === 'json_import' ? 'royal-gradient text-white shadow' : 'text-slate-600 hover:bg-slate-100' ?>">
+                📦 Bulk JSON Import &amp; Duplicate Check
             </a>
             <a href="/admin?tab=analytics" class="px-4 py-2 rounded-xl text-xs font-extrabold transition <?= $active_tab === 'analytics' ? 'royal-gradient text-white shadow' : 'text-slate-600 hover:bg-slate-100' ?>">
                 📊 Search Analytics (<?= number_format($analytics_summary['total_searches']) ?>)
@@ -886,6 +1030,163 @@ function togglePass() {
                 </div>
             </div>
             <?php endif; ?>
+        </div>
+
+        <?php elseif ($active_tab === 'json_import'): ?>
+        <!-- BULK JSON UPLOAD, DUPLICATE INSPECTOR & OTA PUBLISHER -->
+        <div class="space-y-6">
+            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <h2 class="font-extrabold text-slate-900 text-sm">Bulk JSON Uploader &amp; Smart Duplicate Checker</h2>
+                        <p class="text-xs text-slate-500">Upload Bus Routes, Auto Routes, Stop Coordinates, or Bus Stops JSON. Inspect duplicates, conflicts, and GPS/timing validation before publishing live OTA updates.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span class="text-slate-400 font-bold mr-1">Samples:</span>
+                        <button type="button" onclick="loadSampleFormat('bus_routes')" class="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 font-bold hover:bg-blue-100">Bus JSON</button>
+                        <button type="button" onclick="loadSampleFormat('auto_routes')" class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100">Auto JSON</button>
+                        <button type="button" onclick="loadSampleFormat('stop_coords')" class="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 font-bold hover:bg-purple-100">Coords JSON</button>
+                        <button type="button" onclick="loadSampleFormat('stops')" class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100">Stops JSON</button>
+                    </div>
+                </div>
+
+                <form id="jsonImportForm" onsubmit="analyzeJsonUpload(event)" class="p-6 space-y-4 text-xs">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block font-bold text-slate-700 uppercase mb-1.5">1. Select JSON File (.json)</label>
+                            <input type="file" id="jsonFileInput" name="json_file" accept=".json,application/json"
+                                onchange="onJsonFileSelected(this)"
+                                class="w-full px-3 py-2.5 rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-400 bg-slate-50 font-medium text-slate-700 cursor-pointer">
+                            <p id="jsonFileMeta" class="text-[11px] text-slate-400 mt-1">Supports full files (e.g. bus-routes.json, kolkata-auto-routes.json, west-bengal-bus-stop-coords.json).</p>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-700 uppercase mb-1.5">Dataset Type</label>
+                            <select id="jsonFormatHint" name="format_hint" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-800">
+                                <option value="auto" selected>✨ Auto-Detect Schema</option>
+                                <option value="bus_routes">🚌 Bus Routes JSON</option>
+                                <option value="auto_routes">🛺 Auto Routes JSON</option>
+                                <option value="stop_coords">📍 Stop Coordinates JSON</option>
+                                <option value="stops">🛑 Bus Stops Directory JSON</option>
+                            </select>
+                            <p class="text-[11px] text-slate-400 mt-1">Auto-detection inspects keys &amp; fields automatically.</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block font-bold text-slate-700 uppercase">Or Paste Raw JSON</label>
+                            <button type="button" onclick="clearJsonUpload()" class="text-[11px] font-bold text-slate-400 hover:text-red-600">Clear</button>
+                        </div>
+                        <textarea id="jsonTextInput" name="json_text" rows="5" placeholder='Paste JSON array/object here if not uploading a file...'
+                            class="w-full px-3 py-2.5 rounded-xl border border-slate-200 font-mono text-[11px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+
+                    <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                        <div class="text-[11px] text-slate-500">
+                            Checks run: Schema, WB GPS bounds, swapped lat/lng, speed/timing sanity, in-file duplicates &amp; live DB diff.
+                        </div>
+                        <button type="submit" id="analyzeJsonBtn" class="px-5 py-2.5 royal-gradient text-white font-extrabold rounded-xl shadow-lg shadow-blue-500/20 hover:opacity-95 transition flex items-center gap-2">
+                            <span>🔍</span>
+                            <span>Analyze &amp; Check Duplicates</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Analysis Report Container -->
+            <div id="jsonAnalysisBox" class="hidden space-y-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span id="detectedTypeBadge" class="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase bg-blue-100 text-blue-800">AUTO_ROUTES</span>
+                                <h3 class="font-extrabold text-slate-900 text-sm">Pre-Publish Inspection Report</h3>
+                            </div>
+                            <div id="checksRunList" class="text-[11px] text-slate-500 mt-1"></div>
+                        </div>
+                        <button type="button" onclick="downloadJsonReport()" class="px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition shrink-0">
+                            ⬇️ Download Check Report
+                        </button>
+                    </div>
+
+                    <!-- Summary Metrics -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 text-center">
+                        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                            <div class="text-[10px] font-bold text-slate-500 uppercase">Uploaded</div>
+                            <div id="sumTotal" class="text-lg font-black text-slate-900">0</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                            <div class="text-[10px] font-bold text-emerald-700 uppercase">Net New</div>
+                            <div id="sumNew" class="text-lg font-black text-emerald-700">0</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-amber-50 border border-amber-200">
+                            <div class="text-[10px] font-bold text-amber-700 uppercase">Modified / Conflict</div>
+                            <div id="sumConflicts" class="text-lg font-black text-amber-700">0</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-blue-50 border border-blue-200">
+                            <div class="text-[10px] font-bold text-blue-700 uppercase">DB Duplicates</div>
+                            <div id="sumExactDups" class="text-lg font-black text-blue-700">0</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-purple-50 border border-purple-200">
+                            <div class="text-[10px] font-bold text-purple-700 uppercase">In-File Dups</div>
+                            <div id="sumInFileDups" class="text-lg font-black text-purple-700">0</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-yellow-50 border border-yellow-200">
+                            <div class="text-[10px] font-bold text-yellow-700 uppercase">Warnings</div>
+                            <div id="sumWarnings" class="text-lg font-black text-yellow-700">0</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-red-50 border border-red-200">
+                            <div class="text-[10px] font-bold text-red-700 uppercase">Errors (Blocked)</div>
+                            <div id="sumErrors" class="text-lg font-black text-red-700">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Commit Action Bar -->
+                    <div class="p-4 rounded-xl bg-slate-900 text-white flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-2 text-xs">
+                            <span class="font-extrabold text-slate-300 uppercase">Conflict Action:</span>
+                            <select id="commitModeSelect" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-bold">
+                                <option value="skip_duplicates" selected>🛡️ Skip Duplicates &amp; Add Net-New Only</option>
+                                <option value="upsert_conflicts">🔄 Add New + Overwrite Matching Conflicts</option>
+                                <option value="replace_all">⚠️ Replace Full Dataset (All Valid Deduplicated)</option>
+                            </select>
+                        </div>
+                        <button type="button" id="commitJsonBtn" onclick="commitJsonUpload()" class="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                            <span>🚀</span>
+                            <span>Publish to Database &amp; Push OTA</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Detailed Rows Table -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-5 py-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                            <button type="button" onclick="filterJsonItems('all')" class="json-filter-btn px-3 py-1 rounded-lg font-bold bg-slate-900 text-white" data-filter="all">All</button>
+                            <button type="button" onclick="filterJsonItems('new')" class="json-filter-btn px-3 py-1 rounded-lg font-bold bg-slate-100 text-slate-700" data-filter="new">Net New</button>
+                            <button type="button" onclick="filterJsonItems('conflict_modified')" class="json-filter-btn px-3 py-1 rounded-lg font-bold bg-slate-100 text-slate-700" data-filter="conflict_modified">Conflicts</button>
+                            <button type="button" onclick="filterJsonItems('exact_duplicate')" class="json-filter-btn px-3 py-1 rounded-lg font-bold bg-slate-100 text-slate-700" data-filter="exact_duplicate">DB Duplicates</button>
+                            <button type="button" onclick="filterJsonItems('in_file_duplicate')" class="json-filter-btn px-3 py-1 rounded-lg font-bold bg-slate-100 text-slate-700" data-filter="in_file_duplicate">In-File Dups</button>
+                            <button type="button" onclick="filterJsonItems('warnings')" class="json-filter-btn px-3 py-1 rounded-lg font-bold bg-slate-100 text-slate-700" data-filter="warnings">Warnings</button>
+                            <button type="button" onclick="filterJsonItems('error')" class="json-filter-btn px-3 py-1 rounded-lg font-bold bg-slate-100 text-slate-700" data-filter="error">Errors</button>
+                        </div>
+                        <span id="jsonRowsShowing" class="text-[11px] font-mono text-slate-400">Showing 0 rows</span>
+                    </div>
+                    <div class="overflow-x-auto max-h-[540px] overflow-y-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 text-slate-500 font-bold uppercase border-b border-slate-100 sticky top-0">
+                                <tr>
+                                    <th class="px-4 py-3">#</th>
+                                    <th class="px-4 py-3">Status</th>
+                                    <th class="px-4 py-3">Item / Route</th>
+                                    <th class="px-4 py-3">Check Findings &amp; Diff</th>
+                                </tr>
+                            </thead>
+                            <tbody id="jsonAnalysisRows" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <?php elseif ($active_tab === 'analytics'): ?>
@@ -1591,6 +1892,225 @@ async function submitAppUpdate(e) {
     } finally {
         btn.disabled = false;
         btn.textContent = 'Save & Push App Update';
+    }
+}
+
+// =======================================================================
+// 7. BULK JSON ANALYZER & OTA PUBLISHER
+// =======================================================================
+let _lastJsonAnalysis = null;
+
+function escHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function onJsonFileSelected(input) {
+    const meta = document.getElementById('jsonFileMeta');
+    if (input.files && input.files[0]) {
+        const f = input.files[0];
+        meta.textContent = `Selected "${f.name}" (${(f.size / 1024).toFixed(1)} KB)`;
+    } else {
+        meta.textContent = 'Supports full files (e.g. bus-routes.json, kolkata-auto-routes.json, west-bengal-bus-stop-coords.json).';
+    }
+}
+
+function clearJsonUpload() {
+    document.getElementById('jsonFileInput').value = '';
+    document.getElementById('jsonTextInput').value = '';
+    document.getElementById('jsonFileMeta').textContent = 'Cleared. Choose a .json file or paste JSON.';
+    document.getElementById('jsonAnalysisBox').classList.add('hidden');
+    _lastJsonAnalysis = null;
+}
+
+async function loadSampleFormat(type) {
+    try {
+        const res = await fetch(`/admin?action=sample_json&type=${encodeURIComponent(type)}`);
+        const text = await res.text();
+        document.getElementById('jsonFileInput').value = '';
+        document.getElementById('jsonTextInput').value = text;
+        document.getElementById('jsonFormatHint').value = type;
+        showToast(`Loaded sample ${type} JSON format.`);
+    } catch (e) {
+        showToast('Failed to load sample JSON', true);
+    }
+}
+
+function buildJsonFormData(extraFields = {}) {
+    const fd = new FormData();
+    const fileInput = document.getElementById('jsonFileInput');
+    const textInput = document.getElementById('jsonTextInput');
+    const hint = document.getElementById('jsonFormatHint').value;
+    if (fileInput.files && fileInput.files[0]) {
+        fd.append('json_file', fileInput.files[0]);
+    } else {
+        fd.append('json_text', textInput.value);
+    }
+    fd.append('format_hint', hint);
+    Object.entries(extraFields).forEach(([k, v]) => fd.append(k, v));
+    return fd;
+}
+
+async function analyzeJsonUpload(e) {
+    e.preventDefault();
+    const btn = document.getElementById('analyzeJsonBtn');
+    const oldHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span><span>Analyzing JSON &amp; Checking DB...</span>';
+
+    try {
+        const res = await fetch('/admin?action=analyze_json', {
+            method: 'POST',
+            body: buildJsonFormData(),
+        });
+        const data = await res.json();
+        if (!data.success) {
+            showToast(data.error || 'Analysis failed', true);
+            return;
+        }
+        _lastJsonAnalysis = data;
+        renderJsonAnalysis(data);
+        showToast(`Analyzed ${data.summary.total_uploaded} entries (${data.detected_type}).`);
+    } catch (err) {
+        showToast('Network/server error while analyzing JSON', true);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldHtml;
+    }
+}
+
+function renderJsonAnalysis(data) {
+    const box = document.getElementById('jsonAnalysisBox');
+    box.classList.remove('hidden');
+    const s = data.summary || {};
+
+    document.getElementById('detectedTypeBadge').textContent = (data.detected_type || '').toUpperCase();
+    document.getElementById('checksRunList').textContent = 'Checks run: ' + (data.checks_run || []).join(' • ');
+    document.getElementById('sumTotal').textContent = s.total_uploaded || 0;
+    document.getElementById('sumNew').textContent = s.new_count || 0;
+    document.getElementById('sumConflicts').textContent = s.conflicts_count || 0;
+    document.getElementById('sumExactDups').textContent = s.exact_duplicates_count || 0;
+    document.getElementById('sumInFileDups').textContent = s.in_file_duplicates_count || 0;
+    document.getElementById('sumWarnings').textContent = s.warnings_count || 0;
+    document.getElementById('sumErrors').textContent = s.errors_count || 0;
+
+    // Default to showing conflicts/errors/new if present, otherwise all
+    filterJsonItems('all');
+}
+
+function filterJsonItems(filter) {
+    if (!_lastJsonAnalysis) return;
+    document.querySelectorAll('.json-filter-btn').forEach(btn => {
+        const active = btn.dataset.filter === filter;
+        btn.className = active
+            ? 'json-filter-btn px-3 py-1 rounded-lg font-bold bg-slate-900 text-white'
+            : 'json-filter-btn px-3 py-1 rounded-lg font-bold bg-slate-100 text-slate-700 hover:bg-slate-200';
+    });
+
+    const allItems = _lastJsonAnalysis.items || [];
+    const filtered = allItems.filter(it => {
+        if (filter === 'all') return true;
+        if (filter === 'warnings') return (it.warnings || []).length > 0;
+        return it.status === filter;
+    });
+
+    const maxRender = 250;
+    const shown = filtered.slice(0, maxRender);
+    document.getElementById('jsonRowsShowing').textContent =
+        filtered.length > maxRender
+            ? `Showing first ${maxRender} of ${filtered.length} matching rows`
+            : `Showing ${filtered.length} rows`;
+
+    const tbody = document.getElementById('jsonAnalysisRows');
+    if (shown.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400">No entries match this filter.</td></tr>';
+        return;
+    }
+
+    const badges = {
+        new: '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-black text-[10px]">NEW</span>',
+        exact_duplicate: '<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-black text-[10px]">DB DUPLICATE</span>',
+        in_file_duplicate: '<span class="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-black text-[10px]">IN-FILE DUP</span>',
+        conflict_modified: '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-black text-[10px]">MODIFIED</span>',
+        error: '<span class="px-2 py-0.5 rounded-full bg-red-100 text-red-800 font-black text-[10px]">ERROR</span>',
+    };
+
+    tbody.innerHTML = shown.map(it => {
+        let extra = '';
+        if (it.diff) {
+            const fc = it.diff.fields_changed || {};
+            const fcHtml = Object.entries(fc).map(([k, v]) =>
+                `<span class="inline-block mr-2 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-[10px] font-mono"><b>${escHtml(k)}:</b> ${escHtml(v[0])} &rarr; ${escHtml(v[1])}</span>`
+            ).join('');
+            const added = (it.diff.stops_added || []).length
+                ? `<div class="text-[10px] text-emerald-700 mt-1">+ Stops added: ${escHtml(it.diff.stops_added.join(', '))}</div>` : '';
+            const removed = (it.diff.stops_removed || []).length
+                ? `<div class="text-[10px] text-red-700 mt-0.5">- Stops removed: ${escHtml(it.diff.stops_removed.join(', '))}</div>` : '';
+            extra += `<div class="mt-1">${fcHtml}${added}${removed}</div>`;
+        }
+        if ((it.warnings || []).length) {
+            extra += `<div class="mt-1 text-[10px] text-amber-700 font-semibold">⚠️ ${it.warnings.map(escHtml).join(' • ')}</div>`;
+        }
+        if ((it.errors || []).length) {
+            extra += `<div class="mt-1 text-[10px] text-red-700 font-bold">⛔ ${it.errors.map(escHtml).join(' • ')}</div>`;
+        }
+
+        return `
+        <tr class="hover:bg-slate-50 align-top">
+            <td class="px-4 py-3 font-mono text-[11px] text-slate-400">${it.index + 1}</td>
+            <td class="px-4 py-3 whitespace-nowrap">${badges[it.status] || escHtml(it.status)}</td>
+            <td class="px-4 py-3 font-bold text-slate-900">
+                <div>${escHtml(it.label)}</div>
+                <div class="text-[10px] font-mono text-slate-400">${escHtml(it.key)}</div>
+            </td>
+            <td class="px-4 py-3 text-slate-700">
+                <div>${escHtml(it.reason)}</div>
+                ${extra}
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function downloadJsonReport() {
+    if (!_lastJsonAnalysis) return;
+    const blob = new Blob([JSON.stringify(_lastJsonAnalysis, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `cholokolkata_check_report_${_lastJsonAnalysis.detected_type || 'data'}.json`;
+    a.click();
+}
+
+async function commitJsonUpload() {
+    if (!_lastJsonAnalysis) {
+        showToast('Run Analyze & Check Duplicates first.', true);
+        return;
+    }
+    const mode = document.getElementById('commitModeSelect').value;
+    if (mode === 'replace_all' && !confirm('⚠️ Replace Full Dataset will wipe and replace ALL existing records of this dataset type on the live server! Continue?')) {
+        return;
+    }
+
+    const btn = document.getElementById('commitJsonBtn');
+    const oldHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span><span>Publishing &amp; Bumping OTA...</span>';
+
+    try {
+        const res = await fetch('/admin?action=commit_json', {
+            method: 'POST',
+            body: buildJsonFormData({ mode }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message || 'Published OTA bundle!');
+            setTimeout(() => window.location.reload(), 1300);
+        } else {
+            showToast(data.error || 'Publish failed', true);
+        }
+    } catch (err) {
+        showToast('Network error publishing JSON', true);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldHtml;
     }
 }
 </script>

@@ -1,7 +1,109 @@
+import 'dart:convert';
+import 'dart:io' show gzip;
 import 'dart:math';
+import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class KolkataGeo {
+  static const String _prefCoordsGzKey = 'ota_stop_coords_gz_v1';
+  static const String _prefCoordsVersionKey = 'ota_coords_version';
+
+  static Map<String, LatLng> _assetStopCoords = {};
+  static bool _isInitialized = false;
+  static String _coordsVersion = '2.4.0';
+
+  static int get totalCoordsCount => _assetStopCoords.length;
+  static String get coordsVersion => _coordsVersion;
+
+  static String normalizeStopKey(String raw) {
+    final noParen = raw.toLowerCase().replaceAll(RegExp(r'\([^)]*\)'), ' ');
+    return noParen.replaceAll(RegExp(r'[^a-z0-9 ]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  static Future<void> init() async {
+    if (_isInitialized) return;
+    // 1. Prefer locally cached OTA coordinates if synced
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final coordsGz = prefs.getString(_prefCoordsGzKey);
+      if (coordsGz != null && coordsGz.isNotEmpty) {
+        final coordsJson = utf8.decode(gzip.decode(base64.decode(coordsGz)));
+        loadFromJsonString(coordsJson);
+        if (_assetStopCoords.isNotEmpty) {
+          _coordsVersion = prefs.getString(_prefCoordsVersionKey) ?? _coordsVersion;
+          return;
+        }
+      }
+    } catch (_) {
+      // Fall back to bundled asset coordinates
+    }
+
+    // 2. Load bundled offline stop coordinates asset
+    try {
+      final jsonStr = await rootBundle.loadString('assets/kolkata_stop_coords.json');
+      loadFromJsonString(jsonStr);
+    } catch (_) {
+      _isInitialized = true;
+    }
+  }
+
+  static void loadFromJsonString(String jsonStr) {
+    final decoded = json.decode(jsonStr) as Map<String, dynamic>;
+    final parsed = <String, LatLng>{};
+    for (final entry in decoded.entries) {
+      final v = entry.value;
+      double? lat;
+      double? lng;
+      if (v is List && v.length >= 2) {
+        lat = (v[0] as num?)?.toDouble();
+        lng = (v[1] as num?)?.toDouble();
+      } else if (v is Map) {
+        lat = (v['lat'] as num?)?.toDouble();
+        lng = ((v['lng'] ?? v['lon']) as num?)?.toDouble();
+      }
+      if (lat == null || lng == null) continue;
+      final norm = normalizeStopKey(entry.key);
+      if (norm.isEmpty) continue;
+      parsed[norm] = LatLng(lat, lng);
+    }
+    if (parsed.isNotEmpty || _assetStopCoords.isEmpty) {
+      _assetStopCoords = parsed;
+    }
+    _isInitialized = true;
+  }
+
+  /// Applies freshly synced OTA stop coordinates in memory and persists compressed on device.
+  static Future<bool> applyOtaCoords({
+    required String version,
+    required String coordsJson,
+  }) async {
+    try {
+      final decoded = json.decode(coordsJson);
+      if (decoded is! Map<String, dynamic> || decoded.isEmpty) {
+        return false;
+      }
+      loadFromJsonString(coordsJson);
+      _coordsVersion = version;
+
+      final prefs = await SharedPreferences.getInstance();
+      final gz = base64.encode(gzip.encode(utf8.encode(coordsJson)));
+      await prefs.setString(_prefCoordsGzKey, gz);
+      await prefs.setString(_prefCoordsVersionKey, version);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static double haversineKm(LatLng a, LatLng b) {
+    const p = 0.017453292519943295;
+    final val = 0.5 -
+        cos((b.latitude - a.latitude) * p) / 2 +
+        cos(a.latitude * p) * cos(b.latitude * p) * (1 - cos((b.longitude - a.longitude) * p)) / 2;
+    return 12742.0 * asin(sqrt(val.clamp(0.0, 1.0)));
+  }
+
   static final Map<String, LatLng> landmarkCoordinates = {
     'howrah station': const LatLng(22.5850, 88.3426),
     'howrah': const LatLng(22.5850, 88.3426),
@@ -114,6 +216,28 @@ class KolkataGeo {
     'uttarpara': const LatLng(22.6680, 88.3440),
   };
 
+  /// Matches a stop name to bundled GPS coordinates, landmark coordinates, or interpolates between boundaries
+  static LatLng? lookupExactCoord(String stopName) {
+    final k = normalizeStopKey(stopName);
+    if (k.isNotEmpty && _assetStopCoords.containsKey(k)) {
+      return _assetStopCoords[k];
+    }
+    final stripped = k
+        .replaceAll(RegExp(r'\b(more|mord|stand|auto stand|bus stand|bus stop|crossing|junction|stn|station|bazar|bazaar|market|cinema|gate|mor|ghat)\b'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (stripped.isNotEmpty && _assetStopCoords.containsKey(stripped)) {
+      return _assetStopCoords[stripped];
+    }
+    final clean = stopName.toLowerCase().trim();
+    for (final entry in landmarkCoordinates.entries) {
+      if (clean == entry.key || clean.contains(entry.key) || entry.key.contains(clean)) {
+        return entry.value;
+      }
+    }
+    return null;
+  }
+
   /// Matches a stop name to a known landmark or interpolates between boundaries
   static LatLng resolveCoordinate(
     String stopName,
@@ -122,12 +246,8 @@ class KolkataGeo {
     LatLng? originHint,
     LatLng? destHint,
   }) {
-    final clean = stopName.toLowerCase().trim();
-    for (final entry in landmarkCoordinates.entries) {
-      if (clean == entry.key || clean.contains(entry.key) || entry.key.contains(clean)) {
-        return entry.value;
-      }
-    }
+    final exact = lookupExactCoord(stopName);
+    if (exact != null) return exact;
 
     final start = originHint ?? const LatLng(22.5850, 88.3426); // Default Howrah
     final end = destHint ?? const LatLng(22.5804, 88.4378);    // Default Sector V
@@ -167,11 +287,7 @@ class KolkataGeo {
   }
 
   static LatLng? _quickFind(String name) {
-    final clean = name.toLowerCase().trim();
-    for (final entry in landmarkCoordinates.entries) {
-      if (clean.contains(entry.key)) return entry.value;
-    }
-    return null;
+    return lookupExactCoord(name);
   }
 }
 

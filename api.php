@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // 256-bit AES-GCM Transit Security Key
 define('TRANSIT_SECURITY_KEY', 'KolkataTransitSecureKey2026WIMT!');
+require_once __DIR__ . '/admin/json_importer.php';
 
 function secure_encrypt($payload)
 {
@@ -684,9 +685,13 @@ if ($route === 'analytics/searches' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 // -------------------------------------------------------------
 // 8. BACKGROUND OTA UPDATE CHECK & FULL BUNDLE SYNC
 // -------------------------------------------------------------
-function bump_ota_version_file($changelog = null)
+function bump_ota_version_file($changelog = null, $db = null)
 {
     $vfile = __DIR__ . '/ota_version.json';
+    if ($db instanceof mysqli) {
+        $info = cholo_bump_ota_version_with_counts($vfile, $db, $changelog);
+        return $info['version'];
+    }
     $v = '2.4.0';
     if (file_exists($vfile)) {
         $vdata = json_decode(file_get_contents($vfile), true);
@@ -716,7 +721,7 @@ if ($route === 'ota/check' || $route === 'sync') {
     $vfile = __DIR__ . '/ota_version.json';
     $v = '2.4.0';
     $has_update = false;
-    $changelog = 'Kolkata bus route database synced via OTA.';
+    $changelog = 'Kolkata bus, auto & GPS transit database synced via OTA.';
     if (file_exists($vfile)) {
         $vdata = json_decode(file_get_contents($vfile), true);
         if (!empty($vdata['version'])) {
@@ -728,21 +733,16 @@ if ($route === 'ota/check' || $route === 'sync') {
         }
     }
     $db = get_db();
-    $rcnt = 0;
-    $scnt = 0;
-    if ($r1 = $db->query("SELECT COUNT(*) AS c FROM routes")) {
-        $rcnt = (int) ($r1->fetch_assoc()['c'] ?? 0);
-    }
-    if ($r2 = $db->query("SELECT COUNT(*) AS c FROM stops")) {
-        $scnt = (int) ($r2->fetch_assoc()['c'] ?? 0);
-    }
+    $counts = cholo_get_ota_counts($db);
     echo json_encode(secure_encrypt([
         'success' => true,
         'version' => $v,
         'current_version' => $v,
         'has_updates' => $has_update,
-        'total_routes' => $rcnt,
-        'total_stops' => $scnt,
+        'total_routes' => $counts['bus_routes'],
+        'total_stops' => $counts['stops'],
+        'total_auto_routes' => $counts['auto_routes'],
+        'total_stop_coords' => $counts['stop_coords'],
         'changelog' => $changelog
     ]));
     exit;
@@ -805,11 +805,17 @@ if ($route === 'ota/bundle') {
         ];
     }
 
+    // Fetch Auto routes & Stop GPS coordinates for Option B OTA sync
+    $auto_routes = cholo_fetch_auto_routes_payload($db);
+    $stop_coords = cholo_fetch_stop_coords_payload($db);
+
     echo json_encode(secure_encrypt([
         'success' => true,
         'version' => $v,
         'routes' => $routes_map,
         'stops' => $stops_list,
+        'auto_routes' => $auto_routes,
+        'stop_coords' => $stop_coords,
     ]));
     exit;
 }
@@ -923,7 +929,7 @@ if ($route === 'admin/route/add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $m_stmt->execute();
     }
 
-    $new_v = bump_ota_version_file("Route $r_no ($orig ➔ $dest) added via Admin API.");
+    $new_v = bump_ota_version_file("Route $r_no ($orig ➔ $dest) added via Admin API.", $db);
 
     echo json_encode([
         'success' => true,

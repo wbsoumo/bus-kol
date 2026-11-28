@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'screens/spot_bus_screen.dart';
 import 'screens/metro_screen.dart';
+import 'screens/auto_ferry_screens.dart';
 import 'screens/chat_screen.dart';
 import 'screens/drawer_pages.dart';
 import 'screens/settings_screen.dart';
@@ -9,6 +10,8 @@ import 'screens/onboarding_screen.dart';
 import 'screens/live_track_sheet.dart';
 import 'services/api_service.dart';
 import 'services/app_update_service.dart';
+import 'services/kolkata_geo.dart';
+import 'services/multi_transit_service.dart';
 import 'services/notification_service.dart';
 import 'services/search_analytics_service.dart';
 import 'services/settings_service.dart';
@@ -18,7 +21,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService().init();
   await SettingsService().init();
+  await KolkataGeo.init();
   await BusDataService().init();
+  await MultiTransitService().init();
   runApp(const CholoKolkataApp());
 }
 
@@ -78,8 +83,8 @@ class _MainHomeScreenState extends State<MainHomeScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Only 2 Top Tabs: BUSES and METRO (Where is My Train exact model)
-    _tabController = TabController(length: 2, vsync: this);
+    // 4 Offline Transit Tabs: BUSES, METRO, AUTO, FERRY (Train used in Break Journey Suggestions)
+    _tabController = TabController(length: 4, vsync: this);
     _checkForOtaUpdates();
     SearchAnalyticsService().flushQueue();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -253,17 +258,20 @@ class _MainHomeScreenState extends State<MainHomeScreen>
                 ),
               ),
             ],
-            // Top 2 Tabs ONLY
+            // Top 4 Offline Transit Tabs
             bottom: TabBar(
               controller: _tabController,
               indicatorColor: Colors.white,
               indicatorWeight: 3,
               labelColor: Colors.white,
               unselectedLabelColor: Colors.white70,
-              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5),
+              labelPadding: EdgeInsets.zero,
               tabs: const [
-                Tab(icon: Icon(Icons.directions_bus, size: 20), text: 'BUSES'),
-                Tab(icon: Icon(Icons.subway, size: 20), text: 'METRO'),
+                Tab(icon: Icon(Icons.directions_bus, size: 19), text: 'BUSES'),
+                Tab(icon: Icon(Icons.subway, size: 19), text: 'METRO'),
+                Tab(icon: Icon(Icons.electric_rickshaw, size: 19), text: 'AUTO'),
+                Tab(icon: Icon(Icons.directions_boat, size: 19), text: 'FERRY'),
               ],
             ),
           ),
@@ -328,6 +336,27 @@ class _MainHomeScreenState extends State<MainHomeScreen>
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const MetroDirectoryPage()));
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.electric_rickshaw, color: Color(0xFF00796B)),
+                        title: Text(
+                          'Offline Auto Routes (${MultiTransitService().allAutoRoutes.length})',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                        subtitle: const Text('Kolkata & Suburb Auto Stands + Timings', style: TextStyle(fontSize: 11)),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _tabController.animateTo(2);
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.directions_boat, color: Color(0xFF0277BD)),
+                        title: const Text('Hooghly River Ferry Ghats', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        subtitle: const Text('Ferry Timings, Fares & Ghat GPS', style: TextStyle(fontSize: 11)),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _tabController.animateTo(3);
                         },
                       ),
                       ListTile(
@@ -434,6 +463,8 @@ class _MainHomeScreenState extends State<MainHomeScreen>
                   children: const [
                     SpotBusScreen(),
                     MetroScreen(),
+                    AutoScreen(),
+                    FerryScreen(),
                   ],
                 ),
               ),

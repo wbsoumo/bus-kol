@@ -5,7 +5,9 @@ import 'package:cryptography/cryptography.dart';
 import '../models/models.dart';
 import 'bus_data_service.dart';
 import 'metro_service.dart';
+import 'kolkata_geo.dart';
 import 'kolkata_stops.dart';
+import 'multi_transit_service.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -288,9 +290,10 @@ class ApiService {
     return await _secureGet('/api/ota/bundle', timeout: const Duration(seconds: 25));
   }
 
-  /// Checks OTA version/route counts and silently updates the device's offline database
+  /// Checks OTA version/route counts and silently updates Bus, Auto & Stop Coords offline databases
   Future<Map<String, dynamic>> syncOtaInBackground({bool force = false}) async {
     final busData = BusDataService();
+    final multi = MultiTransitService();
     final check = await checkBackgroundSync(busData.dataVersion);
     if (check['error'] != null) {
       return {
@@ -300,14 +303,21 @@ class ApiService {
         'version': busData.dataVersion,
         'total_routes': busData.totalRoutesCount,
         'total_stops': KolkataStops.totalStopsCount,
+        'total_auto_routes': multi.totalAutoRoutesCount,
+        'total_stop_coords': KolkataGeo.totalCoordsCount,
       };
     }
 
     final serverVersion = (check['version'] ?? check['current_version'] ?? busData.dataVersion).toString();
     final serverRoutes = (check['total_routes'] is num) ? (check['total_routes'] as num).toInt() : 0;
+    final serverAutoRoutes = (check['total_auto_routes'] is num) ? (check['total_auto_routes'] as num).toInt() : 0;
+    final serverCoords = (check['total_stop_coords'] is num) ? (check['total_stop_coords'] as num).toInt() : 0;
+
     final hasUpdates = check['has_updates'] == true ||
         serverVersion != busData.dataVersion ||
-        (serverRoutes > 0 && serverRoutes != busData.totalRoutesCount);
+        (serverRoutes > 0 && serverRoutes != busData.totalRoutesCount) ||
+        (serverAutoRoutes > 0 && serverAutoRoutes != multi.totalAutoRoutesCount) ||
+        (serverCoords > 0 && serverCoords != KolkataGeo.totalCoordsCount);
 
     if (!hasUpdates && !force) {
       return {
@@ -316,6 +326,8 @@ class ApiService {
         'version': busData.dataVersion,
         'total_routes': busData.totalRoutesCount,
         'total_stops': KolkataStops.totalStopsCount,
+        'total_auto_routes': multi.totalAutoRoutesCount,
+        'total_stop_coords': KolkataGeo.totalCoordsCount,
       };
     }
 
@@ -326,28 +338,58 @@ class ApiService {
         'version': serverVersion,
         'total_routes': busData.totalRoutesCount,
         'total_stops': KolkataStops.totalStopsCount,
+        'total_auto_routes': multi.totalAutoRoutesCount,
+        'total_stop_coords': KolkataGeo.totalCoordsCount,
         'changelog': check['changelog'] ?? 'All routes already up to date.',
       };
     }
 
     final bundle = await fetchOtaBundle();
-    if (bundle['success'] == true && bundle['routes'] != null) {
-      final routesJson = json.encode(bundle['routes']);
-      final stopsJson = json.encode(bundle['stops'] ?? []);
+    if (bundle['success'] == true) {
       final bundleVer = (bundle['version'] ?? serverVersion).toString();
-      final applied = await busData.applyOtaBundle(
-        version: bundleVer,
-        routesJson: routesJson,
-        stopsJson: stopsJson,
-      );
-      if (applied) {
+      bool anyApplied = false;
+
+      // Apply Stop GPS Coordinates first so updated routes resolve accurately
+      if (bundle['stop_coords'] is Map && (bundle['stop_coords'] as Map).isNotEmpty) {
+        final coordsApplied = await KolkataGeo.applyOtaCoords(
+          version: bundleVer,
+          coordsJson: json.encode(bundle['stop_coords']),
+        );
+        if (coordsApplied) anyApplied = true;
+      }
+
+      // Apply Auto Routes OTA
+      if (bundle['auto_routes'] is List && (bundle['auto_routes'] as List).isNotEmpty) {
+        final autoApplied = await multi.applyOtaAutoRoutes(
+          version: bundleVer,
+          autoJson: json.encode(bundle['auto_routes']),
+        );
+        if (autoApplied) anyApplied = true;
+      }
+
+      // Apply Bus Routes & Bus Stops OTA
+      if (bundle['routes'] is Map && (bundle['routes'] as Map).isNotEmpty) {
+        final routesJson = json.encode(bundle['routes']);
+        final stopsJson = json.encode(bundle['stops'] ?? []);
+        final busApplied = await busData.applyOtaBundle(
+          version: bundleVer,
+          routesJson: routesJson,
+          stopsJson: stopsJson,
+        );
+        if (busApplied) anyApplied = true;
+      }
+
+      if (anyApplied) {
         return {
           'success': true,
           'updated': true,
           'version': bundleVer,
           'total_routes': busData.totalRoutesCount,
           'total_stops': KolkataStops.totalStopsCount,
-          'changelog': check['changelog'] ?? 'Synced ${busData.totalRoutesCount} routes offline (v$bundleVer).',
+          'total_auto_routes': multi.totalAutoRoutesCount,
+          'total_stop_coords': KolkataGeo.totalCoordsCount,
+          'changelog': check['changelog'] ??
+              'Synced ${busData.totalRoutesCount} bus & ${multi.totalAutoRoutesCount} auto routes offline (v$bundleVer).',
         };
       }
     }
@@ -358,6 +400,8 @@ class ApiService {
       'version': busData.dataVersion,
       'total_routes': busData.totalRoutesCount,
       'total_stops': KolkataStops.totalStopsCount,
+      'total_auto_routes': multi.totalAutoRoutesCount,
+      'total_stop_coords': KolkataGeo.totalCoordsCount,
     };
   }
 

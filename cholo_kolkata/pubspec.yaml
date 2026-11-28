@@ -63,6 +63,15 @@ flutter:
   assets:
     - assets/kolkata_bus_routes.json
     - assets/kolkata_stops.json
+    - assets/kolkata_auto_routes.json
+    - assets/kolkata_ferry_routes.json
+    - assets/kolkata_rail_routes.json
+    - assets/kolkata_stop_coords.json
+    - assets/icons/google_maps.png
+    - assets/icons/uber.png
+    - assets/icons/rapido.png
+    - assets/icons/yatri_sathi.png
+    - assets/icons/aamar_kolkata_metro.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -3,9 +3,11 @@ import '../models/models.dart';
 import '../services/api_service.dart';
 import '../services/bus_data_service.dart';
 import '../services/bus_photo_service.dart';
+import '../services/multi_transit_service.dart';
 import '../services/search_analytics_service.dart';
 import '../services/settings_service.dart';
 import '../widgets/bus_photo_viewer.dart';
+import 'break_journey_detail_screen.dart';
 import 'live_track_sheet.dart';
 
 class ResultsScreen extends StatefulWidget {
@@ -28,6 +30,14 @@ class _ResultsScreenState extends State<ResultsScreen> {
   String _error = '';
   List<BusRoute> _directRoutes = [];
   List<TransferRoute> _transferRoutes = [];
+  List<BreakJourneyOption> _breakLessTime = [];
+  List<BreakJourneyOption> _breakLessChanges = [];
+  List<BreakJourneyOption> _breakCheapest = [];
+  bool _expandLessTime = true;
+  bool _expandLessChanges = false;
+  bool _expandCheapest = false;
+  bool _showBreakSuggestions = false;
+  bool _breakSuggestionsLoaded = false;
   String _filter = 'all';
 
   late String _currentFrom;
@@ -43,19 +53,27 @@ class _ResultsScreenState extends State<ResultsScreen> {
   }
 
   void _performSearch() async {
-    // 1. Instant 0ms 100% Offline Search (all 2,172 routes + 1-transfer hub engine)
+    // 1. Instant 0ms 100% Offline Search (all 2,172 routes + break journey hub engine)
     final busData = BusDataService();
     final List<BusRoute> localDirect = _isBusNoSearch
         ? busData.searchBusNumbers(_currentFrom, uniqueByRouteNo: false, limit: 80)
         : busData.searchRoutes(_currentFrom, _currentTo, limit: 80);
 
-    final List<TransferRoute> localTransfers = (!_isBusNoSearch && localDirect.length < 4)
-        ? busData.searchTransfers(_currentFrom, _currentTo)
+    final List<TransferRoute> localTransfers = !_isBusNoSearch
+        ? busData.searchTransfers(_currentFrom, _currentTo, maxTransfers: 6)
         : [];
 
     setState(() {
       _directRoutes = localDirect;
       _transferRoutes = localTransfers;
+      _breakLessTime = [];
+      _breakLessChanges = [];
+      _breakCheapest = [];
+      _expandLessTime = true;
+      _expandLessChanges = false;
+      _expandCheapest = false;
+      _showBreakSuggestions = false;
+      _breakSuggestionsLoaded = false;
       _isLoading = false;
       _error = '';
     });
@@ -79,7 +97,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
           if (netDirect.isNotEmpty) {
             _directRoutes = netDirect;
           }
-          if (netTransfers.isNotEmpty) {
+          if (netTransfers.isNotEmpty && _transferRoutes.isEmpty) {
             _transferRoutes = netTransfers;
           }
         });
@@ -87,6 +105,21 @@ class _ResultsScreenState extends State<ResultsScreen> {
     } catch (_) {
       // Offline dataset already resolved the search cleanly.
     }
+  }
+
+  void _computeBestBreakJourneys() {
+    if (_isBusNoSearch) return;
+    final grouped = MultiTransitService().suggestGroupedBreakJourneys(_currentFrom, _currentTo);
+    setState(() {
+      _breakLessTime = grouped.lessTime;
+      _breakLessChanges = grouped.lessChanges;
+      _breakCheapest = grouped.cheapest;
+      _expandLessTime = true;
+      _expandLessChanges = false;
+      _expandCheapest = false;
+      _breakSuggestionsLoaded = true;
+      _showBreakSuggestions = true;
+    });
   }
 
   void _swapAndRefresh() {
@@ -103,6 +136,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
   }
 
   List<BusRoute> get _filteredRoutes {
+    if (_filter == 'break') return const [];
     if (_filter == 'ac') {
       return _directRoutes.where((r) => r.busType.toLowerCase().contains('ac')).toList();
     } else if (_filter == 'state') {
@@ -257,16 +291,23 @@ class _ResultsScreenState extends State<ResultsScreen> {
           Container(
             color: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                _buildFilterPill('ALL', 'all'),
-                const SizedBox(width: 8),
-                _buildFilterPill('AC BUSES', 'ac'),
-                const SizedBox(width: 8),
-                _buildFilterPill('STATE (WBTC)', 'state'),
-                const SizedBox(width: 8),
-                _buildFilterPill('MINIBUS', 'mini'),
-              ],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildFilterPill('ALL', 'all'),
+                  const SizedBox(width: 8),
+                  _buildFilterPill('AC BUSES', 'ac'),
+                  const SizedBox(width: 8),
+                  _buildFilterPill('STATE (WBTC)', 'state'),
+                  const SizedBox(width: 8),
+                  _buildFilterPill('MINIBUS', 'mini'),
+                  if (!_isBusNoSearch) ...[
+                    const SizedBox(width: 8),
+                    _buildFilterPill('BREAK JOURNEY', 'break'),
+                  ],
+                ],
+              ),
             ),
           ),
 
@@ -285,39 +326,87 @@ class _ResultsScreenState extends State<ResultsScreen> {
                   )
                 : _error.isNotEmpty
                     ? Center(child: Text(_error))
-                    : _filteredRoutes.isEmpty && _transferRoutes.isEmpty
+                    : _filteredRoutes.isEmpty && _transferRoutes.isEmpty && !_showBreakSuggestions
                         ? _buildEmptyState()
                         : ListView(
                             padding: const EdgeInsets.all(12),
                             children: [
-                              // If 0 direct routes but transfers exist
-                              if (_filteredRoutes.isEmpty && _transferRoutes.isNotEmpty)
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFF3E0),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFFFE0B2)),
-                                  ),
-                                  child: const Row(
-                                    children: [
-                                      Icon(Icons.shuffle, color: Color(0xFFE65100), size: 20),
-                                      SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          'No direct bus running. Showing recommended 1-Transfer connecting routes via major hubs:',
-                                          style: TextStyle(color: Color(0xFFE65100), fontWeight: FontWeight.w700, fontSize: 12),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                              // If 0 direct routes (and not user clicking BREAK JOURNEY pill) -> offer Smart Multimodal Break Journey CTA
+                              if (_filteredRoutes.isEmpty && _filter != 'break' && !_isBusNoSearch)
+                                _buildSuggestBestBreakCard(noDirectFound: true),
 
                               // Direct Bus Cards
                               ..._filteredRoutes.map((r) => _buildBusCard(r)),
 
-                              // 1-Transfer Multi-Hop Cards
+                              // Suggest Best Break Journey CTA even when direct buses exist (or when BREAK filter active)
+                              if (!_isBusNoSearch && (_filteredRoutes.isNotEmpty || _filter == 'break') && !_showBreakSuggestions)
+                                _buildSuggestBestBreakCard(noDirectFound: false),
+
+                              // Suggested Best Break Journeys (Collapsible: Less Time, Less Changes, Cheapest)
+                              if (_showBreakSuggestions) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.bolt, size: 17, color: Color(0xFF1565C0)),
+                                      const SizedBox(width: 6),
+                                      const Expanded(
+                                        child: Text(
+                                          'SUGGESTED BREAK JOURNEYS',
+                                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: Color(0xFF1E293B), letterSpacing: 0.4),
+                                        ),
+                                      ),
+                                      Text(
+                                        'Tap route for details',
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: SettingsService().currentTheme.primary),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (_breakSuggestionsLoaded && _breakLessTime.isEmpty && _breakLessChanges.isEmpty && _breakCheapest.isEmpty)
+                                  Card(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Text(
+                                        'No faster Train/Auto/Bus break combination found between "$_currentFrom" and "$_currentTo". Check 1-Transfer bus routes below or refine stop names.',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                                      ),
+                                    ),
+                                  )
+                                else ...[
+                                  _buildBreakCategoryGroup(
+                                    title: 'Less Time (Fastest ETA)',
+                                    subtitle: _breakLessTime.isNotEmpty ? 'From ${_breakLessTime.first.totalEtaMins} mins' : '',
+                                    icon: Icons.bolt,
+                                    color: const Color(0xFF1565C0),
+                                    options: _breakLessTime,
+                                    isExpanded: _expandLessTime,
+                                    onToggle: () => setState(() => _expandLessTime = !_expandLessTime),
+                                  ),
+                                  _buildBreakCategoryGroup(
+                                    title: 'Less Changes (Fewest Transfers)',
+                                    subtitle: _breakLessChanges.isNotEmpty
+                                        ? '${_breakLessChanges.first.legs.length <= 1 ? 'Direct Rail' : '${_breakLessChanges.first.legs.length - 1} Change'}'
+                                        : '',
+                                    icon: Icons.swap_horiz,
+                                    color: const Color(0xFF00796B),
+                                    options: _breakLessChanges,
+                                    isExpanded: _expandLessChanges,
+                                    onToggle: () => setState(() => _expandLessChanges = !_expandLessChanges),
+                                  ),
+                                  _buildBreakCategoryGroup(
+                                    title: 'Cheapest (Lowest Fare)',
+                                    subtitle: _breakCheapest.isNotEmpty ? 'From ₹${_breakCheapest.first.totalFareInr}' : '',
+                                    icon: Icons.savings_outlined,
+                                    color: const Color(0xFF2E7D32),
+                                    options: _breakCheapest,
+                                    isExpanded: _expandCheapest,
+                                    onToggle: () => setState(() => _expandCheapest = !_expandCheapest),
+                                  ),
+                                ],
+                              ],
+
+                              // 1-Transfer Bus Break Journey Cards
                               if (_transferRoutes.isNotEmpty) ...[
                                 Container(
                                   padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
@@ -326,7 +415,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                                       Icon(Icons.shuffle, size: 16, color: Color(0xFF37474F)),
                                       SizedBox(width: 6),
                                       Text(
-                                        '1-TRANSFER ROUTES (VIA TRANSIT HUBS)',
+                                        'BUS BREAK JOURNEYS (1-TRANSFER HUBS)',
                                         style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFF37474F), letterSpacing: 0.5),
                                       ),
                                     ],
@@ -622,27 +711,354 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
+  Widget _buildSuggestBestBreakCard({required bool noDirectFound}) {
+    final theme = SettingsService().currentTheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: noDirectFound ? const Color(0xFFFFF8E1) : const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: noDirectFound ? const Color(0xFFFFCC80) : const Color(0xFFBFDBFE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                noDirectFound ? Icons.alt_route : Icons.route,
+                color: noDirectFound ? const Color(0xFFE65100) : theme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  noDirectFound
+                      ? 'No direct bus route found between "$_currentFrom" and "$_currentTo"'
+                      : 'Want a faster Break Journey route?',
+                  style: TextStyle(
+                    color: noDirectFound ? const Color(0xFFE65100) : const Color(0xFF1E3A8A),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Combine Suburban Train + Bus + Share Auto (plus Ferry/Metro), ranked strictly by shortest ETA.',
+            style: TextStyle(fontSize: 11.5, color: Colors.grey[800]),
+          ),
+          if (!_showBreakSuggestions) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _computeBestBreakJourneys,
+                icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 17),
+                label: const Text(
+                  'Suggest Best Break Journey',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: noDirectFound ? const Color(0xFFE65100) : theme.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Color _modeBadgeColor(TransitMode mode) {
+    switch (mode) {
+      case TransitMode.train:
+        return const Color(0xFF3949AB);
+      case TransitMode.bus:
+        return SettingsService().currentTheme.primary;
+      case TransitMode.auto:
+        return const Color(0xFF00796B);
+      case TransitMode.ferry:
+        return const Color(0xFF0277BD);
+      case TransitMode.metro:
+        return const Color(0xFF1565C0);
+    }
+  }
+
+  IconData _modeBadgeIcon(TransitMode mode) {
+    switch (mode) {
+      case TransitMode.train:
+        return Icons.train;
+      case TransitMode.bus:
+        return Icons.directions_bus;
+      case TransitMode.auto:
+        return Icons.electric_rickshaw;
+      case TransitMode.ferry:
+        return Icons.directions_boat;
+      case TransitMode.metro:
+        return Icons.subway;
+    }
+  }
+
+  Widget _buildBreakCategoryGroup({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required List<BreakJourneyOption> options,
+    required bool isExpanded,
+    required VoidCallback onToggle,
+  }) {
+    if (options.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: isExpanded ? color.withAlpha(110) : const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onToggle,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: color.withAlpha(24),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: Icon(icon, size: 17, color: color),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: color),
+                        ),
+                        if (subtitle.isNotEmpty)
+                          Text(
+                            '$subtitle • ${options.length} route${options.length > 1 ? 's' : ''}',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Icon(isExpanded ? Icons.expand_less : Icons.expand_more, color: color),
+                ],
+              ),
+            ),
+          ),
+          if (isExpanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: Column(
+                children: options
+                    .asMap()
+                    .entries
+                    .map((entry) => _buildBreakShortCard(entry.key, entry.value, title, color))
+                    .toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBreakShortCard(
+    int idx,
+    BreakJourneyOption opt,
+    String categoryTitle,
+    Color accentColor,
+  ) {
+    final changes = opt.legs.length > 1 ? opt.legs.length - 1 : 0;
+    final hubsChain = <String>[
+      if (opt.legs.isNotEmpty) opt.legs.first.fromStop,
+      for (final l in opt.legs) l.toStop,
+    ].join(' ➔ ');
+
+    return Card(
+      margin: const EdgeInsets.only(top: 6),
+      elevation: 0.8,
+      color: const Color(0xFFF8FAFC),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(9),
+        side: BorderSide(color: idx == 0 ? accentColor.withAlpha(110) : const Color(0xFFE2E8F0)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(9),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BreakJourneyDetailScreen(
+                fromQuery: _currentFrom,
+                toQuery: _currentTo,
+                option: opt,
+                categoryLabel: categoryTitle.toUpperCase(),
+              ),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(11),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Row 1: Short metrics strip (ETA, Changes, KM, Fare)
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: idx == 0 ? accentColor : const Color(0xFF334155),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text(
+                      '${opt.totalEtaMins} mins',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    changes == 0 ? 'Direct' : '$changes change${changes > 1 ? 's' : ''}',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '• ${opt.totalDistanceKm} km',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(color: const Color(0xFFA5D6A7)),
+                    ),
+                    child: Text(
+                      '₹${opt.totalFareInr}',
+                      style: const TextStyle(color: Color(0xFF1B5E20), fontWeight: FontWeight.w900, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Row 2: Visual Mode Icons + Arrows
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (int i = 0; i < opt.legs.length; i++) ...[
+                      if (i > 0)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4),
+                          child: Icon(Icons.arrow_forward_rounded, size: 15, color: Color(0xFF64748B)),
+                        ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _modeBadgeColor(opt.legs[i].mode),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(_modeBadgeIcon(opt.legs[i].mode), size: 12, color: Colors.white),
+                            const SizedBox(width: 4),
+                            Text(
+                              opt.legs[i].badge.toUpperCase() == transitModeLabel(opt.legs[i].mode)
+                                  ? transitModeLabel(opt.legs[i].mode)
+                                  : '${transitModeLabel(opt.legs[i].mode)} ${opt.legs[i].badge}',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 10),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+
+              // Row 3: Short stop points + Tap prompt
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      hubsChain,
+                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text('Details', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: accentColor)),
+                  Icon(Icons.chevron_right, size: 15, color: accentColor),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.directions_bus_outlined, size: 64, color: Colors.grey),
+            const Icon(Icons.directions_bus_outlined, size: 58, color: Colors.grey),
             const SizedBox(height: 12),
             Text(
               _isBusNoSearch ? 'No buses matching "$_currentFrom"' : 'No direct buses found',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
             ),
             const SizedBox(height: 6),
             Text(
               _isBusNoSearch
                   ? 'Try searching with route numbers like "215A", "S-12", "AC-12", or "44A".'
-                  : 'No bus registered between "$_currentFrom" and "$_currentTo". Try searching via major hubs like Howrah, Esplanade, or Ultadanga.',
+                  : 'No direct bus runs between "$_currentFrom" and "$_currentTo". Let CholoKolkata combine Train, Bus, and Auto sorted by shortest ETA.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey[600], fontSize: 13),
             ),
+            if (!_isBusNoSearch) ...[
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _computeBestBreakJourneys,
+                  icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+                  label: const Text(
+                    'Suggest Best Break Journey',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: SettingsService().currentTheme.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

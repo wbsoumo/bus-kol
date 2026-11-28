@@ -824,26 +824,44 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Left Distance label
+                // Left Distance & Timing label (high-contrast & theme-matched)
                 SizedBox(
-                  width: 46,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${(idx * 1.3).toStringAsFixed(1)} km',
-                        style: TextStyle(
-                          color: isUserBusHere ? theme.primary : Colors.grey[500],
-                          fontSize: 11,
-                          fontWeight: isUserBusHere ? FontWeight.bold : FontWeight.normal,
+                  width: 56,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isUserBusHere
+                          ? theme.primary.withAlpha(28)
+                          : inJourney
+                              ? theme.lightBg
+                              : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(
+                        color: inJourney ? theme.badgeBg : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${(idx * 1.3).toStringAsFixed(1)} km',
+                          style: TextStyle(
+                            color: inJourney || isUserBusHere ? theme.primary : const Color(0xFF334155),
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
-                      Text(
-                        '${(idx * 3 + 5)}m',
-                        style: TextStyle(color: Colors.grey[400], fontSize: 9),
-                      ),
-                    ],
+                        Text(
+                          '+${(idx * 3 + 5)} min',
+                          style: TextStyle(
+                            color: inJourney || isUserBusHere ? theme.secondary : const Color(0xFF475569),
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
@@ -1239,11 +1257,20 @@ class _LiveTrackScreenState extends State<LiveTrackScreen> {
   }
 
   Widget _buildMetric(String value, String label) {
-    return Column(
-      children: [
-        Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: SettingsService().currentTheme.primary)),
-        Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[600], fontWeight: FontWeight.w600)),
-      ],
+    final theme = SettingsService().currentTheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: theme.lightBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.badgeBg),
+      ),
+      child: Column(
+        children: [
+          Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: theme.primary)),
+          Text(label, style: TextStyle(fontSize: 10, color: theme.secondary, fontWeight: FontWeight.w700)),
+        ],
+      ),
     );
   }
 }

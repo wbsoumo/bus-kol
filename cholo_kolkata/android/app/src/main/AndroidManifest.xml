@@ -60,6 +60,28 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <package android:name="com.google.android.apps.maps"/>
+        <package android:name="com.ubercab"/>
+        <package android:name="com.rapido.passenger"/>
+        <package android:name="in.juspay.jatrisaathi"/>
+        <package android:name="org.cris.kmmts"/>
+        <package android:name="com.android.vending"/>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="market"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="uber"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="geo"/>
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

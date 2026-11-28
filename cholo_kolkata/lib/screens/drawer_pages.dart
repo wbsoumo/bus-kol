@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/bus_data_service.dart';
+import '../services/kolkata_geo.dart';
 import '../services/kolkata_stops.dart';
+import '../services/multi_transit_service.dart';
 import '../services/settings_service.dart';
 import 'results_screen.dart';
 
@@ -527,8 +529,10 @@ class _OtaSyncPageState extends State<OtaSyncPage> {
                     ),
                     const Divider(height: 24),
                     _buildSyncStat('Local Database Version', 'v${BusDataService().dataVersion} (Kolkata Core)'),
-                    _buildSyncStat('Total Indexed Routes', '${BusDataService().totalRoutesCount} Routes'),
+                    _buildSyncStat('Total Bus Routes', '${BusDataService().totalRoutesCount} Routes'),
+                    _buildSyncStat('Total Auto Corridors', '${MultiTransitService().totalAutoRoutesCount} Routes'),
                     _buildSyncStat('Total Bus Stops', '${KolkataStops.totalStopsCount} Stops'),
+                    _buildSyncStat('Geocoded GPS Stops', '${KolkataGeo.totalCoordsCount} Pins'),
                     _buildSyncStat('Metro Corridors', '5 Lines (50 Stations)'),
                     _buildSyncStat('Payload Encryption', 'AES-256-GCM Secure'),
                     _buildSyncStat('Last Synchronization', BusDataService().lastSyncTime),

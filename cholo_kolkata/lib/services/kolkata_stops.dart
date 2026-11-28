@@ -118,6 +118,21 @@ class KolkataStops {
       });
   }
 
+  /// Appends additional transit hubs (Auto/Ferry/Rail) without overriding primary Bus stops.
+  static void addExtraStops(List<BusStopItem> extras) {
+    if (extras.isEmpty) return;
+    final base = _allStops.isNotEmpty ? _allStops : List<BusStopItem>.from(popularStops);
+    final existingKeys = {for (final s in base) s.name.toLowerCase()};
+    final updated = List<BusStopItem>.from(base);
+    for (final s in extras) {
+      final k = s.name.toLowerCase();
+      if (k.isNotEmpty && existingKeys.add(k)) {
+        updated.add(s);
+      }
+    }
+    _allStops = updated;
+  }
+
   static String _normalizeStopQuery(String query) {
     var q = query.replaceAll(RegExp(r'\s*\([^)]*\)\s*'), ' ').trim().toLowerCase();
     const aliases = {

@@ -556,14 +556,23 @@ class MetroService {
       );
     }
 
-    final s1 = defaultMetroStations.firstWhere(
-      (s) => s.stationName.toLowerCase() == from.toLowerCase(),
-      orElse: () => defaultMetroStations.first,
-    );
-    final s2 = defaultMetroStations.firstWhere(
-      (s) => s.stationName.toLowerCase() == to.toLowerCase(),
-      orElse: () => defaultMetroStations.last,
-    );
+    final fromMatches = defaultMetroStations.where((s) => s.stationName.toLowerCase() == from.toLowerCase()).toList();
+    final toMatches = defaultMetroStations.where((s) => s.stationName.toLowerCase() == to.toLowerCase()).toList();
+
+    MetroStation s1 = fromMatches.isNotEmpty ? fromMatches.first : defaultMetroStations.first;
+    MetroStation s2 = toMatches.isNotEmpty ? toMatches.first : defaultMetroStations.last;
+
+    // Prefer a direct shared line whenever origin & destination exist on the same line (e.g. Howrah Maidan <-> Esplanade on Green Line)
+    for (final m1 in fromMatches) {
+      for (final m2 in toMatches) {
+        if (m1.lineId == m2.lineId) {
+          s1 = m1;
+          s2 = m2;
+          break;
+        }
+      }
+      if (s1.lineId == s2.lineId) break;
+    }
 
     // 1. Direct Same-Line Journey
     if (s1.lineId == s2.lineId) {
@@ -661,7 +670,7 @@ class MetroService {
       leg2LineName: s2.lineName,
       leg2LineColor: s2.lineColor,
       leg2Stations: leg2,
-      instructions: 'Take ${s1.lineName} to $interchange. Change train to ${s2.lineName} towards $to.',
+      instructions: 'Take ${s1.lineName} to $interchange. Switch from ${s1.lineName} to ${s2.lineName} at $interchange towards $to.',
     );
   }
 }

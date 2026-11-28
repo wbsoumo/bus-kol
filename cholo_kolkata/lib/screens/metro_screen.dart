@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../services/external_app_launcher.dart';
 import '../services/metro_service.dart';
 import '../services/search_analytics_service.dart';
 import '../services/settings_service.dart';
@@ -330,6 +331,52 @@ class _MetroScreenState extends State<MetroScreen> {
         ),
 
         const SizedBox(height: 14),
+
+        // Official Aamar Kolkata Metro Online Ticket Booking Banner
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: SettingsService().currentTheme.lightBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: SettingsService().currentTheme.badgeBg),
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset('assets/icons/aamar_kolkata_metro.png', width: 44, height: 44, fit: BoxFit.cover),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Book Metro Ticket Online',
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: SettingsService().currentTheme.primary),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Use official Aamar Kolkata Metro app (opens Play Store if not installed).',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF334155)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () => ExternalAppLauncher.openAamarKolkataMetro(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: SettingsService().currentTheme.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('BOOK', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11.5)),
+              ),
+            ],
+          ),
+        ),
 
         // 3. CORRIDOR DIRECTORY SHORTCUT (Link to Side Menu Page)
         InkWell(

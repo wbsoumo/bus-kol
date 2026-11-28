@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
+import '../services/external_app_launcher.dart';
 import '../services/settings_service.dart';
 
 class MetroResultScreen extends StatefulWidget {
@@ -149,53 +150,94 @@ class _MetroResultScreenState extends State<MetroResultScreen> {
               ),
               const SizedBox(height: 14),
 
-              // --- INTERCHANGE TRANSFER CARD (Prominent Transfer Guide) ---
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF8E1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFFCA28), width: 1.5),
-                  boxShadow: [
-                    BoxShadow(color: Colors.amber.withOpacity(0.12), blurRadius: 6, offset: const Offset(0, 3)),
-                  ],
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFFF8F00),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.transfer_within_a_station, color: Colors.white, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              // --- INTERCHANGE TRANSFER CARD (Clear Line-to-Line Switch Visual) ---
+              Builder(builder: (_) {
+                final l1Color = _hexToColor(plan.leg1LineColor ?? '#1976D2');
+                final l2Color = _hexToColor(plan.leg2LineColor ?? '#2E7D32');
+                final l1Short = (plan.leg1LineName ?? 'Line 1').split('(').first.trim();
+                final l2Short = (plan.leg2LineName ?? 'Line 2').split('(').first.trim();
+                final stationLabel = plan.interchangeStation ?? 'Esplanade';
+
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF8E1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFFB300), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(color: Colors.amber.withValues(alpha: 0.14), blurRadius: 6, offset: const Offset(0, 3)),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Row(
-                            children: [
-                              Text(
-                                'CHANGE LINE AT ${plan.interchangeStation?.toUpperCase() ?? "ESPLANADE"}',
-                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFFE65100)),
-                              ),
-                            ],
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFE65100),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.transfer_within_a_station, color: Colors.white, size: 18),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Alight from ${plan.leg1LineName ?? "Line 1"} and follow signs to ${plan.leg2LineName ?? "Connecting Line"} platform via concourse subway (2-3 mins transfer).',
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF424242), height: 1.35),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'CHANGE METRO LINE AT ${stationLabel.toUpperCase()}',
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFFE65100)),
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-              ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                            decoration: BoxDecoration(color: l1Color, borderRadius: BorderRadius.circular(6)),
+                            child: Text(
+                              l1Short,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11.5),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_rounded, size: 18, color: Color(0xFFE65100)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFFFB300)),
+                            ),
+                            child: Text(
+                              'Switch at $stationLabel',
+                              style: const TextStyle(color: Color(0xFFBF360C), fontWeight: FontWeight.w800, fontSize: 11),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_rounded, size: 18, color: Color(0xFFE65100)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                            decoration: BoxDecoration(color: l2Color, borderRadius: BorderRadius.circular(6)),
+                            child: Text(
+                              l2Short,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Get down from $l1Short at $stationLabel and board $l2Short towards ${plan.toStation} (2–3 mins subway walk).',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF334155), fontWeight: FontWeight.w600, height: 1.35),
+                      ),
+                    ],
+                  ),
+                );
+              }),
               const SizedBox(height: 14),
 
               // --- LEG 2 ---
@@ -230,10 +272,13 @@ class _MetroResultScreenState extends State<MetroResultScreen> {
             ],
 
             const SizedBox(height: 20),
-            // Landmark and Facilities Card
+            // Official Aamar Kolkata Metro Online Ticket Booking Banner
             Card(
-              elevation: 1,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: SettingsService().currentTheme.badgeBg),
+              ),
               color: Colors.white,
               child: Padding(
                 padding: const EdgeInsets.all(14),
@@ -242,17 +287,54 @@ class _MetroResultScreenState extends State<MetroResultScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.info_outline, size: 16, color: SettingsService().currentTheme.primary),
-                        const SizedBox(width: 6),
-                        Text('SMART CARD & TOKEN RULES', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: SettingsService().currentTheme.primary)),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.asset(
+                            'assets/icons/aamar_kolkata_metro.png',
+                            width: 44,
+                            height: 44,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Book Metro Ticket Directly Online',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 14,
+                                  color: SettingsService().currentTheme.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                'Skip ticket queues — book QR tickets via the official Aamar Kolkata Metro app.',
+                                style: TextStyle(fontSize: 11.5, color: Color(0xFF475569), height: 1.3),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      '• Kolkata Metro Smart Card users get 10% discount on standard token fares.\n'
-                      '• QR Code tickets are available on the Official Metro App & counter.\n'
-                      '• Maximum allowed journey time between entry and exit is 180 minutes.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.5),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => ExternalAppLauncher.openAamarKolkataMetro(),
+                        icon: const Icon(Icons.qr_code_2, color: Colors.white, size: 18),
+                        label: const Text(
+                          'Open Aamar Kolkata Metro App',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: SettingsService().currentTheme.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
                     ),
                   ],
                 ),

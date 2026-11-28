@@ -13,6 +13,7 @@ RewriteCond %{REQUEST_URI} !\.apk$
 RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
 
 # Admin panel routing
+
 RewriteRule ^admin/?$ admin/index.php [QSA,L]
 RewriteRule ^admin/(.*)$ admin/$1 [QSA,L]
 
